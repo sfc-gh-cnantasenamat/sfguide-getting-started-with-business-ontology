@@ -89,7 +89,7 @@ Business Ontology is the governed meaning layer in Horizon Catalog. It models sh
 
 The SV still computes the number. BON makes the agent pick the right one and say why.
 
-### Two Kinds of Authority
+### Views Compute, Ontology Decides
 
 Most of the decisions in this guide follow from one division of labour:
 
