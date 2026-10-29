@@ -54,7 +54,7 @@ By the end of this guide, your account holds the objects below: three domains of
 | Semantic views | 3 | `PURCHASING_ENRICHED_SV`, `FINANCE_ENRICHED_SV`, `SALES_ENRICHED_SV` |
 | Agents | 7 | The A/B pair is `ENRICHED_AGENT` (SVs only) and `BON_AGENT` (same SVs + ontology search). The script also creates `BARE_AGENT` and two Finance/Sales team pairs used by the benchmark. |
 
-All objects live in `DB_ONTOLOGY_CONTROL_PLANE.SAP_BON_V2`.
+All objects live in `BUSINESS_ONTOLOGY.SAP`.
 
 > **Policies:** the demo stores policies as `itemKind: POLICY_CONCEPT`. The public docs currently document only `TERM`, `METRIC` and `ENTITY`, and the other kinds are not guaranteed to be stable in preview. If you need to stay on documented kinds, model a policy as a `TERM` named "... Policy" and link it with `APPLIES_TO`.
 
@@ -141,42 +141,40 @@ Now that you know the shape of each step, you set up the demo data and the seman
 
 ## Set Up the Demo
 
-**Do:** clone or download the [companion repository](https://github.com/sfc-gh-cnantasenamat/getting-started-with-business-ontology), then run these six scripts in order. The first two create the `SAP_PRODUCTION` source schema and the `ONTOLOGY_WH` warehouse. `sql/v2/01_schema_data.sql` clones those tables into `SAP_BON_V2` and stops with an error if they are missing.
+**Do:** clone or download the [companion repository](https://github.com/sfc-gh-cnantasenamat/getting-started-with-business-ontology), then run the first six scripts in `sql/` in order. Everything lives in the `BUSINESS_ONTOLOGY` database and runs on the `BUSINESS_ONTOLOGY_WH` warehouse, split across two schemas: `RAW` holds the synthetic SAP source tables, and `SAP` holds everything you build on top of them. `03_sap_schema.sql` clones the `RAW` tables into `SAP` and stops with an error if they are missing.
 
 ```
-sql/01_setup_database.sql         # database, SAP_PRODUCTION schema, warehouse
-sql/02_create_sap_tables.sql      # 15 SAP tables + synthetic data
-sql/v2/01_schema_data.sql         # SAP_BON_V2 schema, SAP tables and data
-sql/v2/02_benchmark_ground_truth.sql  # BENCHMARK_QUESTIONS, BENCHMARK_GROUND_TRUTH (20 questions)
-sql/v2/03_bare_svs.sql            # bare SVs (legacy arm; not used in the final comparison)
-sql/v2/04_enriched_svs.sql        # PURCHASING / FINANCE / SALES _ENRICHED_SV
+sql/01_setup.sql              # BUSINESS_ONTOLOGY database, RAW schema, BUSINESS_ONTOLOGY_WH warehouse
+sql/02_raw_data.sql           # 15 SAP tables + synthetic data in RAW
+sql/03_sap_schema.sql         # SAP schema: tables cloned from RAW, T077K and T023T code tables
+sql/04_ground_truth.sql       # BENCHMARK_QUESTIONS, BENCHMARK_GROUND_TRUTH (20 questions)
+sql/05_bare_svs.sql           # CUSTOMERS_VIEW, BOM_EXPLOSION_VIEW, bare SVs (benchmark arm A only)
+sql/06_enriched_svs.sql       # PURCHASING / FINANCE / SALES _ENRICHED_SV
 ```
 
 The remaining scripts are what Steps 1 to 10 run, section by section. Don't run them yet:
 
 ```
-sql/v2/05_bon.sql                 # Steps 1 to 6: 3 domains, 40 nodes, 51 relationships
-sql/v2/06_representations.sql     # Step 7: 43 representations
-sql/v2/07_agents.sql              # Step 9: 7 agents
-sql/v2/08_live_scenarios.sql      # optional, see Going Further
+sql/07_ontology.sql           # Steps 1 to 6: 3 domains, 40 nodes, 51 relationships
+sql/08_representations.sql    # Step 7: 43 representations
+sql/09_agents.sql             # Step 9: 7 agents
+sql/10_live_scenarios.sql     # optional, see Going Further
 ```
 
-> **Script comments:** the header of `05_bon.sql` says 39 nodes and 49 edges, and the header of `06_representations.sql` says 44 representations. Those comments predate the final edits. The statements themselves create 40, 51 and 43, which are the numbers this guide checks.
-
-> **Using a different database?** Every script uses `DB_ONTOLOGY_CONTROL_PLANE`. To use your own name, replace it in all SQL files before running them, then set `SNOWFLAKE_DATABASE` (and `SNOWFLAKE_SCHEMA` if you rename `SAP_BON_V2`) for the benchmark and web app:
+> **Using a different database?** Every script uses `BUSINESS_ONTOLOGY`. To use your own name, replace it in all SQL files before running them, then set `SNOWFLAKE_DATABASE` (and `SNOWFLAKE_SCHEMA` if you rename `SAP`) for the benchmark and web app:
 >
 > ```bash
-> grep -rl DB_ONTOLOGY_CONTROL_PLANE sql | xargs sed -i.bak 's/DB_ONTOLOGY_CONTROL_PLANE/MY_DB/g'
+> grep -rl BUSINESS_ONTOLOGY sql | xargs sed -i.bak 's/BUSINESS_ONTOLOGY/MY_DB/g'
 > export SNOWFLAKE_DATABASE=MY_DB
 > ```
 
 **Check:** the three enriched semantic views exist.
 
 ```sql
-SHOW SEMANTIC VIEWS IN SCHEMA DB_ONTOLOGY_CONTROL_PLANE.SAP_BON_V2;
+SHOW SEMANTIC VIEWS IN SCHEMA BUSINESS_ONTOLOGY.SAP;
 ```
 
-Expected: `PURCHASING_ENRICHED_SV`, `FINANCE_ENRICHED_SV` and `SALES_ENRICHED_SV` (plus the bare views from `03`).
+Expected: `PURCHASING_ENRICHED_SV`, `FINANCE_ENRICHED_SV` and `SALES_ENRICHED_SV` (plus the three bare semantic views from `05`).
 
 With the data and semantic views in place, you're ready to build the ontology itself, starting with the domains that hold everything else.
 
@@ -184,7 +182,7 @@ With the data and semantic views in place, you're ready to build the ontology it
 
 A domain groups the nodes one business area owns.
 
-**Do:** in `sql/v2/05_bon.sql`, run the `Domains` section (the three `SYSTEM$CREATE_GLOSSARY_DOMAIN` statements).
+**Do:** in `sql/07_ontology.sql`, run the `Domains` section (the three `SYSTEM$CREATE_GLOSSARY_DOMAIN` statements).
 
 **With CoCo instead:**
 
@@ -203,7 +201,7 @@ The domains are empty containers for now. Next, you fill them with entities, the
 
 Entities are the business objects that metrics measure. Describe them in business language, and name the key that identifies them.
 
-**Do:** in `05_bon.sql`, run the three node sections (`Procurement nodes`, `Finance & Controlling nodes`, `Sales & Distribution nodes`), stopping at the `Approve` comment. The script is organised by domain, so this one run drafts the entities, metrics, terms and policies for Steps 2 to 4 together: 39 drafts. Steps 3 and 4 explain the metrics, terms and policies you just drafted and have nothing extra to run.
+**Do:** in `07_ontology.sql`, run the three node sections (`Procurement nodes`, `Finance & Controlling nodes`, `Sales & Distribution nodes`), stopping at the `Approve` comment. The script is organised by domain, so this one run drafts the entities, metrics, terms and policies for Steps 2 to 4 together: 39 drafts. Steps 3 and 4 explain the metrics, terms and policies you just drafted and have nothing extra to run.
 
 **With CoCo instead:**
 
@@ -226,7 +224,7 @@ Entities give the ontology its nouns. Next come the metrics that measure them, w
 
 This is where most of the value comes from. For each metric, write down which number is canonical, and **also add the defensible-but-wrong look-alike** as its own node that says it is not the canonical one. That gives the agent something to tell apart.
 
-**Do:** nothing new to run; Step 2 drafted all 16 metrics. Read them in `05_bon.sql` to see the pattern, for example *Supplier Count* next to *Vendor Record Count*, and *Revenue* next to *Gross Bookings*.
+**Do:** nothing new to run; Step 2 drafted all 16 metrics. Read them in `07_ontology.sql` to see the pattern, for example *Supplier Count* next to *Vendor Record Count*, and *Revenue* next to *Gross Bookings*.
 
 **With CoCo instead:**
 
@@ -310,7 +308,7 @@ Relationships connect nodes with typed edges. Use the most specific type. Direct
 | `RELATED_TO` | only when nothing else fits | used sparingly |
 | `CUSTOM` | only on explicit request, and needs a label | Not used in the demo |
 
-**Do:** in `05_bon.sql`, three actions in this order. Relationship calls refer to nodes by name, so the nodes must be approved first.
+**Do:** in `07_ontology.sql`, three actions in this order. Relationship calls refer to nodes by name, so the nodes must be approved first.
 
 1. Approve the 39 drafts from Step 2 (this session only):
 
@@ -398,14 +396,14 @@ The table lists the same roles, with how many of each the demo creates.
 | `DESCRIBES` | term → column | 7 |
 | `REFERENCE_DATA` | term → code table (T077K, T023T) | 2 |
 
-**Do:** run all of `sql/v2/06_representations.sql`: 43 `SYSTEM$CREATE_GLOSSARY_ASSOCIATION` statements.
+**Do:** run all of `sql/08_representations.sql`: 43 `SYSTEM$CREATE_GLOSSARY_ASSOCIATION` statements.
 
 **With CoCo instead:**
 
 ```
 $business-ontology In Procurement, associate the metric Supplier Count with metric
 ACTIVE_SUPPLIER_COUNT (logical table VENDORS) in semantic view
-DB_ONTOLOGY_CONTROL_PLANE.SAP_BON_V2.PURCHASING_ENRICHED_SV as IMPLEMENTS.
+BUSINESS_ONTOLOGY.SAP.PURCHASING_ENRICHED_SV as IMPLEMENTS.
 Then propose representations for every other node in all three domains and show them for review.
 ```
 
@@ -413,7 +411,7 @@ Underneath:
 
 ```sql
 SELECT SYSTEM$CREATE_GLOSSARY_ASSOCIATION('Procurement.On-Time Delivery Rate',
-  '{"refType":"SEMANTIC_VIEW","fqn":"DB_ONTOLOGY_CONTROL_PLANE.SAP_BON_V2.PURCHASING_ENRICHED_SV",
+  '{"refType":"SEMANTIC_VIEW","fqn":"BUSINESS_ONTOLOGY.SAP.PURCHASING_ENRICHED_SV",
     "subObjectType":"METRIC","entityQualifier":"SHIPMENTS","subObjectName":"OPERATIONAL_OTD_RATE"}',
   'IMPLEMENTS');
 ```
@@ -449,7 +447,7 @@ The diagram below shows what happens when a question comes in. The agent first s
 
 ![How the agent uses the ontology](assets/agent.png)
 
-**Do:** run all of `sql/v2/07_agents.sql`. It creates 7 agents with the same model, budget and core instructions. The two you use for the A/B comparison are:
+**Do:** run all of `sql/09_agents.sql`. It creates 7 agents with the same model, budget and core instructions. The two you use for the A/B comparison are:
 
 | Arm | Agent | Tools |
 |---|---|---|
@@ -463,16 +461,16 @@ The other five are used only by the full benchmark: `BARE_AGENT` (arm A, bare SV
 ```
 $business-ontology Create an agent that uses the ontology for Procurement, Finance & Controlling
 and Sales & Distribution, with tools for PURCHASING_ENRICHED_SV, FINANCE_ENRICHED_SV and
-SALES_ENRICHED_SV in DB_ONTOLOGY_CONTROL_PLANE.SAP_BON_V2.
+SALES_ENRICHED_SV in BUSINESS_ONTOLOGY.SAP.
 ```
 
 To add the ontology to an agent you already have (the change is additive and keeps your instructions):
 
 ```
-$business-ontology Add the ontology to agent DB_ONTOLOGY_CONTROL_PLANE.SAP_BON_V2.ENRICHED_AGENT
+$business-ontology Add the ontology to agent BUSINESS_ONTOLOGY.SAP.ENRICHED_AGENT
 ```
 
-The core of the demo's `BON_AGENT` (full spec in `sql/v2/07_agents.sql`):
+The core of the demo's `BON_AGENT` (full spec in `sql/09_agents.sql`):
 
 ```yaml
 models:
@@ -499,7 +497,7 @@ tools:
   - tool_spec: {type: cortex_analyst_text_to_sql, name: query_sales,      description: "..."}
 tool_resources:
   business_ontology: {corpus: businessOntology}
-  query_purchasing: {semantic_view: DB_ONTOLOGY_CONTROL_PLANE.SAP_BON_V2.PURCHASING_ENRICHED_SV, ...}
+  query_purchasing: {semantic_view: BUSINESS_ONTOLOGY.SAP.PURCHASING_ENRICHED_SV, ...}
   # query_finance, query_sales likewise
 ```
 
@@ -514,7 +512,7 @@ Note the different spellings: the CLI search type is `business-ontology`, while 
 **Check:** read the three settings back from `BON_AGENT`.
 
 ```sql
-DESCRIBE AGENT DB_ONTOLOGY_CONTROL_PLANE.SAP_BON_V2.BON_AGENT;
+DESCRIBE AGENT BUSINESS_ONTOLOGY.SAP.BON_AGENT;
 ```
 
 Expected: the `agent_spec` column contains `EnableSnowscopeBusinessOntologySearch` set to `true`, a tool of type `snowscope_search`, and `"corpus":"businessOntology"`. With CoCo, ask: `$business-ontology Verify the ontology settings on agent BON_AGENT`.
@@ -538,7 +536,7 @@ Compare two agents that are identical except for the ontology tool: `ENRICHED_AG
 
 ### Run the Benchmark
 
-This part is optional and needs the Python requirements in **What You'll Need**. The benchmark asks 20 questions across four tiers, with ground truth in `sql/v2/02_benchmark_ground_truth.sql`.
+This part is optional and needs the Python requirements in **What You'll Need**. The benchmark asks 20 questions across four tiers, with ground truth in `sql/04_ground_truth.sql`.
 
 **Do:** from the repository root:
 
@@ -590,12 +588,12 @@ Once the ontology is live, most changes take a single prompt. The table lists co
 
 Edits to **ACTIVE** nodes go through an **edit card** (`SYSTEM$DRAFT_GLOSSARY_TERM_UPDATE`). The live definition stays in force until the edit is approved, and agents see the change only after the index refreshes. The skill's quality gate shows the old and new values side by side.
 
-To practise change management on the demo, `sql/v2/08_live_scenarios.sql` contains optional scenarios that edit the ontology and show how the agents respond. For example, a steward changes the official supplier definition, and every BON-enabled agent follows without any edit to a semantic view or agent spec. Each edit must wait for the search index to refresh (up to about 6 hours) before you ask the agents again.
+To practise change management on the demo, `sql/10_live_scenarios.sql` contains optional scenarios that edit the ontology and show how the agents respond. For example, a steward changes the official supplier definition, and every BON-enabled agent follows without any edit to a semantic view or agent spec. Each edit must wait for the search index to refresh (up to about 6 hours) before you ask the agents again.
 
 ### Bootstrap from Semantic Views
 
 ```
-$business-ontology Bootstrap ontology from our semantic views in DB_ONTOLOGY_CONTROL_PLANE.SAP_BON_V2
+$business-ontology Bootstrap ontology from our semantic views in BUSINESS_ONTOLOGY.SAP
 ```
 
 The skill scans the views (`SHOW`/`DESCRIBE`, metrics, comments, verified queries, join graph) and proposes:
@@ -686,8 +684,8 @@ $business-ontology Delete the Procurement domain and all its contents
 Repeat for Finance & Controlling and Sales & Distribution. Then drop the database and warehouse that the setup scripts created:
 
 ```sql
-DROP DATABASE IF EXISTS DB_ONTOLOGY_CONTROL_PLANE;
-DROP WAREHOUSE IF EXISTS ONTOLOGY_WH;
+DROP DATABASE IF EXISTS BUSINESS_ONTOLOGY;
+DROP WAREHOUSE IF EXISTS BUSINESS_ONTOLOGY_WH;
 ```
 
 With the demo objects removed, here's a recap of what you built and where to go next.
