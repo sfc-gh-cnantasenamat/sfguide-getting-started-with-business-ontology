@@ -40,7 +40,7 @@ In this guide, you build exactly that on a synthetic SAP supply-chain dataset: t
 
 ### What You'll Build
 
-![What you'll build](assets/architecture.png)
+By the end of this guide, your account holds the objects below: three domains of governed nodes, the relationships and representations that connect them to each other and to your data, and the semantic views and agents that put them to work. The counts are the same ones the **Check** lines confirm along the way.
 
 | Object | Count | Notes |
 |---|---|---|
@@ -59,6 +59,8 @@ All objects live in `DB_ONTOLOGY_CONTROL_PLANE.SAP_BON_V2`.
 > **Policies:** the demo stores policies as `itemKind: POLICY_CONCEPT`. The public docs currently document only `TERM`, `METRIC` and `ENTITY`, and the other kinds are not guaranteed to be stable in preview. If you need to stay on documented kinds, model a policy as a `TERM` named "... Policy" and link it with `APPLIES_TO`.
 
 ### What You'll Need
+
+Here's what you need before you start. Everything in the table is required except Python, which you only need for the optional full benchmark in Step 10.
 
 | Requirement | Details |
 |---|---|
@@ -80,10 +82,14 @@ Business Ontology is the governed meaning layer in Horizon Catalog. It models sh
 
 **Semantic Views tell Snowflake *how* to compute a metric. Business Ontology tells everyone *what* that metric means, *which* one is canonical, *who* approved it, and *whether* teams agree.**
 
+The table below puts the two layers side by side, using the supplier count example from the introduction.
+
 | Layer | Owns | Example from the demo |
 |---|---|---|
 | Semantic View | Tables, joins, dimensions, metric SQL; executes the number | `PURCHASING_ENRICHED_SV` has both `VENDOR_RECORD_COUNT` (15) and `ACTIVE_SUPPLIER_COUNT` (14) |
 | Business Ontology | Which metric is canonical, business vocabulary, policies, cross-domain links | "Supplier Count" means active suppliers; *Probationary Vendor Exclusion* applies to it; it is implemented by `ACTIVE_SUPPLIER_COUNT` |
+
+The picture below shows the same question asked twice. On the left, the agent has only the semantic views: it sees two defensible metrics, `VENDOR_RECORD_COUNT` and `ACTIVE_SUPPLIER_COUNT`, and either picks one or hedges. On the right, the ontology tells it which metric is official and which policy applies, so it answers 14 and cites the governed term.
 
 ![Semantic views alone compared with semantic views plus Business Ontology](assets/comparison.png)
 
@@ -100,6 +106,8 @@ That's also why a good ontology definition *decides* rather than just describes.
 
 ### What Goes Where
 
+As a rule of thumb, anything about *how* to compute a number belongs in the semantic view, and anything about *which* definition is official, or what a word means across teams, belongs in the ontology. The table gives concrete examples of each.
+
 | Put it in the **Semantic View** | Put it in **Business Ontology** |
 |---|---|
 | Table joins, dimensions, facts | Which of several metrics is the canonical one |
@@ -112,6 +120,8 @@ That's also why a good ontology definition *decides* rather than just describes.
 With that mental model in place, the next section explains how the 10 build steps are laid out, so you know what to expect from each one.
 
 ## How This Guide Works
+
+The diagram below shows the 10 build steps in order. The blue steps (metrics, terms and policies, and the A/B test) are where most of the value comes from, and the amber step is the indexing wait. If you already have semantic views, the dashed bootstrap path can stand in for the early steps.
 
 ![End-to-end process](assets/steps.png)
 
@@ -285,7 +295,7 @@ Every node is now drafted. Next, you approve the drafts and connect them with ty
 
 ## 5. Define Relationships
 
-Relationships connect nodes with typed edges. Use the most specific type. Direction is source → target, except `IS_A`, which runs instance or subtype → class.
+Relationships connect nodes with typed edges. Use the most specific type. Direction is source → target, except `IS_A`, which runs instance or subtype → class. The table lists each type, when to use it, and an example from the demo.
 
 | Type | Use for | Demo example |
 |---|---|---|
@@ -323,6 +333,8 @@ $business-ontology Define these relationships (use domain-qualified names):
 - Procurement.BOM Cost Rollup DERIVES Finance & Controlling.Product Gross Margin
 Then find more relationships I missed in each domain.
 ```
+
+The graph below shows a slice of what you just created. Each box is a node, coloured by kind (entities white, metrics blue, terms purple, policies red), and each arrow is a typed relationship. Notice how *Revenue* in Sales & Distribution and *BOM Cost Rollup* in Procurement both feed *Product Gross Margin* in Finance & Controlling: those two `DERIVES` edges are the cross-domain bridge.
 
 ![A slice of the demo graph](assets/relationships.png)
 
@@ -372,7 +384,11 @@ The ontology now says what things mean. Next, you tie each node to the Snowflake
 
 A representation records which Snowflake object implements a node. This is not just catalog decoration: the skill's agent builder reads approved SV representations to write each SV tool's description, and that description is how the agent chooses which view to query.
 
+There are five representation roles, and each one links a particular kind of node to a particular kind of Snowflake object. The diagram below shows each pairing.
+
 ![Representation roles](assets/representations.png)
+
+The table lists the same roles, with how many of each the demo creates.
 
 | Role | From → To | Demo count |
 |---|---|---|
@@ -428,6 +444,8 @@ Once search can find your terms, or while you wait for it, you create the agents
 ## 9. Build the Agent
 
 The agent searches the ontology first, then queries the semantic view metric the definition points to.
+
+The diagram below shows what happens when a question comes in. The agent first searches the ontology for each business term and gets back the canonical metric, any policies and the company vocabulary. It then computes the number with the semantic view metric that the definition names, combines results across domains when the metric spans more than one, and answers with the governed term cited.
 
 ![How the agent uses the ontology](assets/agent.png)
 
@@ -509,7 +527,7 @@ Compare two agents that are identical except for the ontology tool: `ENRICHED_AG
 
 ### Try It
 
-**Do:** in Snowsight, open **AI & ML > Agents**, and ask `ENRICHED_AGENT` and then `BON_AGENT` the same two questions from the benchmark:
+**Do:** in Snowsight, open **AI & ML > Agents**, and ask `ENRICHED_AGENT` and then `BON_AGENT` the same two questions from the benchmark. For each question, the table gives the answer the ontology makes official and the look-alike answer an agent without it may give.
 
 | Question | Correct answer | Defensible-but-wrong answer |
 |---|---|---|
@@ -560,6 +578,8 @@ The 10 steps are complete. These sections are optional: keeping the ontology cur
 
 ### Update the Ontology
 
+Once the ontology is live, most changes take a single prompt. The table lists common maintenance tasks and the prompt for each.
+
 | Task | Prompt |
 |---|---|
 | Edit a definition or formula | `$business-ontology Update Procurement.Supplier Count: also exclude temporary vendors (ZTMP)` |
@@ -585,6 +605,8 @@ The skill scans the views (`SHOW`/`DESCRIBE`, metrics, comments, verified querie
 - a domain for each candidate, with its provenance shown;
 - `IMPLEMENTS` representations back to the source metrics.
 
+The diagram below shows that flow from left to right. The skill scans your views and proposes candidates, a steward reviews them, and the items the import can't infer are added by hand before everything becomes the approved ontology.
+
 ![Bootstrapping from semantic views](assets/bootstrap.png)
 
 Nothing is written until you approve it at review. What the import **can't** infer is exactly where the value lies:
@@ -596,7 +618,7 @@ Nothing is written until you approve it at review. What the import **can't** inf
 
 Add those by hand using Steps 3 to 5.
 
-Other entry points:
+Semantic views aren't the only starting point. Depending on where your definitions live today, you can start from any of these sources:
 
 | You have | Prompt |
 |---|---|
@@ -610,6 +632,8 @@ Other entry points:
 If any step didn't match its expected check, the table below maps common symptoms to their likely causes and fixes.
 
 ## Troubleshooting
+
+Each row starts from what you see, then gives the most likely cause and the fix.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
@@ -629,6 +653,8 @@ If any step didn't match its expected check, the table below maps common symptom
 For day-to-day work after this guide, the quick reference below collects the calls you used in one place.
 
 ## API Quick Reference
+
+The table lists each operation and the system function behind it.
 
 | Operation | Call |
 |---|---|
