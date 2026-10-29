@@ -40,7 +40,7 @@ In this guide, you build exactly that on a synthetic SAP supply-chain dataset: t
 
 ### What You'll Build
 
-![What you'll build](assets/what-you-will-build.png)
+![What you'll build](assets/architecture.png)
 
 | Object | Count | Notes |
 |---|---|---|
@@ -85,7 +85,7 @@ Business Ontology is the governed meaning layer in Horizon Catalog. It models sh
 | Semantic View | Tables, joins, dimensions, metric SQL; executes the number | `PURCHASING_ENRICHED_SV` has both `VENDOR_RECORD_COUNT` (15) and `ACTIVE_SUPPLIER_COUNT` (14) |
 | Business Ontology | Which metric is canonical, business vocabulary, policies, cross-domain links | "Supplier Count" means active suppliers; *Probationary Vendor Exclusion* applies to it; it is implemented by `ACTIVE_SUPPLIER_COUNT` |
 
-![Semantic views alone compared with semantic views plus Business Ontology](assets/semantic-views-vs-ontology.png)
+![Semantic views alone compared with semantic views plus Business Ontology](assets/comparison.png)
 
 The SV still computes the number. BON makes the agent pick the right one and say why.
 
@@ -113,7 +113,7 @@ With that mental model in place, the next section explains how the 10 build step
 
 ## How This Guide Works
 
-![End-to-end process](assets/end-to-end-process.png)
+![End-to-end process](assets/steps.png)
 
 Each of the 10 steps has the same parts:
 
@@ -170,9 +170,9 @@ Expected: `PURCHASING_ENRICHED_SV`, `FINANCE_ENRICHED_SV` and `SALES_ENRICHED_SV
 
 With the data and semantic views in place, you're ready to build the ontology itself, starting with the domains that hold everything else.
 
-## Create Domains
+## 1. Create Domains
 
-**Step 1 of 10.** A domain groups the nodes one business area owns.
+A domain groups the nodes one business area owns.
 
 **Do:** in `sql/v2/05_bon.sql`, run the `Domains` section (the three `SYSTEM$CREATE_GLOSSARY_DOMAIN` statements).
 
@@ -189,9 +189,9 @@ Underneath: `SYSTEM$CREATE_GLOSSARY_DOMAIN('Procurement')`. Domains are created 
 
 The domains are empty containers for now. Next, you fill them with entities, the business objects that everything else connects to.
 
-## Add Entities
+## 2. Add Entities
 
-**Step 2 of 10.** Entities are the business objects that metrics measure. Describe them in business language, and name the key that identifies them.
+Entities are the business objects that metrics measure. Describe them in business language, and name the key that identifies them.
 
 **Do:** in `05_bon.sql`, run the three node sections (`Procurement nodes`, `Finance & Controlling nodes`, `Sales & Distribution nodes`), stopping at the `Approve` comment. The script is organised by domain, so this one run drafts the entities, metrics, terms and policies for Steps 2 to 4 together: 39 drafts. Steps 3 and 4 explain the metrics, terms and policies you just drafted and have nothing extra to run.
 
@@ -212,9 +212,9 @@ Underneath: `SYSTEM$DRAFT_GLOSSARY_TERM('{"name":"Supplier","domainName":"Procur
 
 Entities give the ontology its nouns. Next come the metrics that measure them, which is where most of the conflicts the ontology resolves actually live.
 
-## Add Metrics
+## 3. Add Metrics
 
-**Step 3 of 10.** This is where most of the value comes from. For each metric, write down which number is canonical, and **also add the defensible-but-wrong look-alike** as its own node that says it is not the canonical one. That gives the agent something to tell apart.
+This is where most of the value comes from. For each metric, write down which number is canonical, and **also add the defensible-but-wrong look-alike** as its own node that says it is not the canonical one. That gives the agent something to tell apart.
 
 **Do:** nothing new to run; Step 2 drafted all 16 metrics. Read them in `05_bon.sql` to see the pattern, for example *Supplier Count* next to *Vendor Record Count*, and *Revenue* next to *Gross Bookings*.
 
@@ -239,7 +239,7 @@ The same pattern applies in the other domains:
 - **Sales & Distribution:** Revenue (net of discounts) versus Gross Bookings (NOT revenue), Customer Discounts, Revenue at Risk.
 
 Notes:
-- `formula` is **descriptive**, not executable. The agent computes numbers with the SV metric and uses the formula to check it (see **Build the Agent**). Write it so a reviewer can see the rule: the numerator, the denominator, the filter and the grain.
+- `formula` is **descriptive**, not executable. The agent computes numbers with the SV metric and uses the formula to check it (see Step 9). Write it so a reviewer can see the rule: the numerator, the denominator, the filter and the grain.
 - Only `METRIC` nodes carry `formula`. The formula is returned by `SYSTEM$GET_GLOSSARY_TERM`, not by graph or list reads.
 - **Cross-domain metrics are the exception.** No single SV computes *Product Gross Margin* or *Revenue at Risk*. Their definitions must name each component and the bridge between domains (for example, "sold assembly → BOM components → material standard cost"), because the agent combines those components itself.
 
@@ -247,9 +247,9 @@ Notes:
 
 Metrics settle which number is official. Terms and policies add the company vocabulary and the business rules that the data alone doesn't spell out.
 
-## Add Terms and Policies
+## 4. Terms and Policies
 
-**Step 4 of 10.** **Terms** decode codes and capture company vocabulary. **Policies** are rules the agent must apply.
+**Terms** decode codes and capture company vocabulary. **Policies** are rules the agent must apply.
 
 **Do:** nothing new to run; Step 2 drafted 7 of the 8 terms and all 3 policies. The eighth term, *Tier A Supplier*, is added at the end of Step 5, because the script adds it in its own section after the relationships.
 
@@ -283,9 +283,9 @@ $business-ontology Add these policies:
 
 Every node is now drafted. Next, you approve the drafts and connect them with typed relationships, so the ontology becomes a connected graph rather than a list.
 
-## Define Relationships
+## 5. Define Relationships
 
-**Step 5 of 10.** Relationships connect nodes with typed edges. Use the most specific type. Direction is source → target, except `IS_A`, which runs instance or subtype → class.
+Relationships connect nodes with typed edges. Use the most specific type. Direction is source → target, except `IS_A`, which runs instance or subtype → class.
 
 | Type | Use for | Demo example |
 |---|---|---|
@@ -324,7 +324,7 @@ $business-ontology Define these relationships (use domain-qualified names):
 Then find more relationships I missed in each domain.
 ```
 
-![A slice of the demo graph](assets/relationships-graph.png)
+![A slice of the demo graph](assets/relationships.png)
 
 Underneath: `SYSTEM$CREATE_GLOSSARY_RELATIONSHIP('Procurement.Tier A Supplier','Procurement.Supplier','IS_A')`. That call writes directly. `SYSTEM$DRAFT_GLOSSARY_RELATIONSHIP(...)` followed by approval routes the edge through review. Both calls accept domain-qualified names or term IDs.
 
@@ -334,9 +334,9 @@ Underneath: `SYSTEM$CREATE_GLOSSARY_RELATIONSHIP('Procurement.Tier A Supplier','
 
 With nodes and relationships in place, take a moment to confirm that everything is approved and counted correctly before you connect it to data.
 
-## Approve and Verify
+## 6. Approve and Verify
 
-**Step 6 of 10.** Drafts are invisible to agents until they are approved. If you followed Step 5, everything is already approved; this step confirms it.
+Drafts are invisible to agents until they are approved. If you followed Step 5, everything is already approved; this step confirms it.
 
 **Do:** run the check below. If any counts are short, approve the remaining drafts with one of these forms:
 
@@ -368,9 +368,9 @@ Expected: 19, 12 and 9 nodes (40 in total), and a formula that excludes probatio
 
 The ontology now says what things mean. Next, you tie each node to the Snowflake object that implements it, so the agent knows where to compute each answer.
 
-## Add Representations
+## 7. Add Representations
 
-**Step 7 of 10.** A representation records which Snowflake object implements a node. This is not just catalog decoration: the skill's agent builder reads approved SV representations to write each SV tool's description, and that description is how the agent chooses which view to query.
+A representation records which Snowflake object implements a node. This is not just catalog decoration: the skill's agent builder reads approved SV representations to write each SV tool's description, and that description is how the agent chooses which view to query.
 
 ![Representation roles](assets/representations.png)
 
@@ -408,9 +408,9 @@ SELECT SYSTEM$CREATE_GLOSSARY_ASSOCIATION('Procurement.On-Time Delivery Rate',
 
 The ontology is complete and bound to your semantic views. Before an agent can use it, though, it has to appear in search, which is what the next step checks.
 
-## Confirm Search Indexing
+## 8. Confirm Search Indexing
 
-**Step 8 of 10.** Agents search an index, not the live glossary. **Indexing can take up to about 6 hours**, and deleted terms can keep appearing in results for a while after deletion.
+Agents search an index, not the live glossary. **Indexing can take up to about 6 hours**, and deleted terms can keep appearing in results for a while after deletion.
 
 **Do:** run these searches from a terminal with the Cortex Code CLI:
 
@@ -425,11 +425,11 @@ cortex search object "tier a suppliers" --types=business-ontology
 
 Once search can find your terms, or while you wait for it, you create the agents that put the ontology to work.
 
-## Build the Agent
+## 9. Build the Agent
 
-**Step 9 of 10.** The agent searches the ontology first, then queries the semantic view metric the definition points to.
+The agent searches the ontology first, then queries the semantic view metric the definition points to.
 
-![How the agent uses the ontology](assets/agent-flow.png)
+![How the agent uses the ontology](assets/agent.png)
 
 **Do:** run all of `sql/v2/07_agents.sql`. It creates 7 agents with the same model, budget and core instructions. The two you use for the A/B comparison are:
 
@@ -503,9 +503,9 @@ Expected: the `agent_spec` column contains `EnableSnowscopeBusinessOntologySearc
 
 Everything is built. The last step shows the difference the ontology makes, by asking two otherwise identical agents the same questions.
 
-## Evaluate with A/B Tests
+## 10. Run A/B Tests
 
-**Step 10 of 10.** Compare two agents that are identical except for the ontology tool: `ENRICHED_AGENT` (B) and `BON_AGENT` (C). Start with a quick hands-on comparison, then run the full benchmark if you want numbers.
+Compare two agents that are identical except for the ontology tool: `ENRICHED_AGENT` (B) and `BON_AGENT` (C). Start with a quick hands-on comparison, then run the full benchmark if you want numbers.
 
 ### Try It
 
@@ -585,7 +585,7 @@ The skill scans the views (`SHOW`/`DESCRIBE`, metrics, comments, verified querie
 - a domain for each candidate, with its provenance shown;
 - `IMPLEMENTS` representations back to the source metrics.
 
-![Bootstrapping from semantic views](assets/bootstrap-flow.png)
+![Bootstrapping from semantic views](assets/bootstrap.png)
 
 Nothing is written until you approve it at review. What the import **can't** infer is exactly where the value lies:
 
