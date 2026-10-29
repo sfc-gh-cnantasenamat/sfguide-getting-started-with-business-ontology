@@ -1,4 +1,4 @@
-author: Tianxia Jia
+author: Tianxia Jia, Chanin Nantasenamat
 id: getting-started-with-business-ontology
 categories: snowflake-site:taxonomy/solution-center/certification/quickstart, snowflake-site:taxonomy/product/ai, snowflake-site:taxonomy/product/platform
 language: en
