@@ -51,7 +51,7 @@ By the end of this guide, your account holds the objects below: three domains of
 | Policies | 3 | Probationary Vendor Exclusion, Credit Memo Sign Rule, BOM Input Protection |
 | Relationships | 51 | MEASURES 13 · DERIVES 13 · CLASSIFIES 8 · RELATED_TO 6 · APPLIES_TO 4 · HAS_PART 3 · HAS_VARIANT 3 · IS_A 1 |
 | Representations | 43 | IMPLEMENTS 12 · REPRESENTS 14 · RELATED_SEMANTIC_VIEW 8 · DESCRIBES 7 · REFERENCE_DATA 2 |
-| Semantic views | 3 | `PURCHASING_ENRICHED_SV`, `FINANCE_ENRICHED_SV`, `SALES_ENRICHED_SV` |
+| Semantic views | 3 | `PROCUREMENT_ENRICHED_SV`, `FINANCE_ENRICHED_SV`, `SALES_ENRICHED_SV` |
 | Agents | 7 | The A/B pair is `ENRICHED_AGENT` (SVs only) and `BON_AGENT` (same SVs + ontology search). The script also creates `BARE_AGENT` and two Finance/Sales team pairs used by the benchmark. |
 
 All objects live in `BUSINESS_ONTOLOGY.SAP`.
@@ -86,7 +86,7 @@ The table below puts the two layers side by side, using the supplier count examp
 
 | Layer | Owns | Example from the demo |
 |---|---|---|
-| Semantic View | Tables, joins, dimensions, metric SQL; executes the number | `PURCHASING_ENRICHED_SV` has both `VENDOR_RECORD_COUNT` (15) and `ACTIVE_SUPPLIER_COUNT` (14) |
+| Semantic View | Tables, joins, dimensions, metric SQL; executes the number | `PROCUREMENT_ENRICHED_SV` has both `VENDOR_RECORD_COUNT` (15) and `ACTIVE_SUPPLIER_COUNT` (14) |
 | Business Ontology | Which metric is canonical, business vocabulary, policies, cross-domain links | "Supplier Count" means active suppliers; *Probationary Vendor Exclusion* applies to it; it is implemented by `ACTIVE_SUPPLIER_COUNT` |
 
 The picture below shows the same question asked twice. On the left, the agent has only the semantic views: it sees two defensible metrics, `VENDOR_RECORD_COUNT` and `ACTIVE_SUPPLIER_COUNT`, and either picks one or hedges. On the right, the ontology tells it which metric is official and which policy applies, so it answers 14 and cites the governed term.
@@ -149,7 +149,7 @@ sql/02_raw_data.sql           # 15 SAP tables + synthetic data in RAW
 sql/03_sap_schema.sql         # SAP schema: tables cloned from RAW, T077K and T023T code tables
 sql/04_ground_truth.sql       # BENCHMARK_QUESTIONS, BENCHMARK_GROUND_TRUTH (20 questions)
 sql/05_bare_svs.sql           # CUSTOMERS_VIEW, BOM_EXPLOSION_VIEW, bare SVs (benchmark arm A only)
-sql/06_enriched_svs.sql       # PURCHASING / FINANCE / SALES _ENRICHED_SV
+sql/06_enriched_svs.sql       # PROCUREMENT / FINANCE / SALES _ENRICHED_SV
 ```
 
 The remaining scripts are what Steps 1 to 10 run, section by section. Don't run them yet:
@@ -174,7 +174,7 @@ sql/10_live_scenarios.sql     # optional, see Going Further
 SHOW SEMANTIC VIEWS IN SCHEMA BUSINESS_ONTOLOGY.SAP;
 ```
 
-Expected: `PURCHASING_ENRICHED_SV`, `FINANCE_ENRICHED_SV` and `SALES_ENRICHED_SV` (plus the three bare semantic views from `05`).
+Expected: `PROCUREMENT_ENRICHED_SV`, `FINANCE_ENRICHED_SV` and `SALES_ENRICHED_SV` (plus the three bare semantic views from `05`).
 
 With the data and semantic views in place, you're ready to build the ontology itself, starting with the domains that hold everything else.
 
@@ -374,7 +374,7 @@ UNION ALL SELECT 'Sales & Distribution', ARRAY_SIZE(PARSE_JSON(SYSTEM$GET_GLOSSA
 SELECT PARSE_JSON(SYSTEM$GET_GLOSSARY_TERM('Procurement.Supplier Count')):formula::STRING;
 ```
 
-Expected: 19, 12 and 9 nodes (40 in total), and a formula that excludes probationary vendors. To inspect edges, `SYSTEM$GET_GLOSSARY_GRAPH('Procurement')` returns the approved graph (drafts are absent; use `SYSTEM$GET_GLOSSARY_DRAFT_GRAPH()` for those). The graph for one domain also includes edges to neighbouring domains, so its counts won't add up to exactly 51.
+Expected: 19, 12 and 9 nodes (40 in total), and a formula that excludes probationary vendors. To inspect edges, `SYSTEM$GET_GLOSSARY_GRAPH('Procurement')` returns the approved graph (drafts are absent; use `SYSTEM$GET_GLOSSARY_DRAFT_GRAPH()` for those). The graph for one domain also includes edges to neighbouring domains, and large graphs can come back truncated, so its counts won't add up to exactly 51.
 
 The ontology now says what things mean. Next, you tie each node to the Snowflake object that implements it, so the agent knows where to compute each answer.
 
@@ -403,7 +403,7 @@ The table lists the same roles, with how many of each the demo creates.
 ```
 $business-ontology In Procurement, associate the metric Supplier Count with metric
 ACTIVE_SUPPLIER_COUNT (logical table VENDORS) in semantic view
-BUSINESS_ONTOLOGY.SAP.PURCHASING_ENRICHED_SV as IMPLEMENTS.
+BUSINESS_ONTOLOGY.SAP.PROCUREMENT_ENRICHED_SV as IMPLEMENTS.
 Then propose representations for every other node in all three domains and show them for review.
 ```
 
@@ -411,14 +411,21 @@ Underneath:
 
 ```sql
 SELECT SYSTEM$CREATE_GLOSSARY_ASSOCIATION('Procurement.On-Time Delivery Rate',
-  '{"refType":"SEMANTIC_VIEW","fqn":"BUSINESS_ONTOLOGY.SAP.PURCHASING_ENRICHED_SV",
+  '{"refType":"SEMANTIC_VIEW","fqn":"BUSINESS_ONTOLOGY.SAP.PROCUREMENT_ENRICHED_SV",
     "subObjectType":"METRIC","entityQualifier":"SHIPMENTS","subObjectName":"OPERATIONAL_OTD_RATE"}',
   'IMPLEMENTS');
 ```
 
 > In preview, representations are **not revalidated** when a semantic view is rebuilt, renamed or dropped, and there is no automatic drift detection between a definition and its implementation. After any SV change, re-check with `$business-ontology Find drift between ontology and semantic views`.
 
-**Check:** all 43 statements succeed (19 for Procurement nodes, 14 for Finance & Controlling, 10 for Sales & Distribution). Each one reports `"validity":"VALID"` when you read it back in the `associations` array of `SYSTEM$GET_GLOSSARY_GRAPH('<domain>')`.
+**Check:** all 43 statements succeed (19 for Procurement nodes, 14 for Finance & Controlling, 10 for Sales & Distribution), and each call returns `"error":false`. Then read back a few representations from the node they belong to:
+
+```sql
+SELECT 'Supplier Count' AS node, TO_JSON(PARSE_JSON(SYSTEM$GET_GLOSSARY_TERM('Procurement.Supplier Count')):representedAs) AS representations
+UNION ALL SELECT 'Customer', TO_JSON(PARSE_JSON(SYSTEM$GET_GLOSSARY_TERM('Sales & Distribution.Customer')):representedAs);
+```
+
+Expected: *Supplier Count* is `IMPLEMENTS` → `ACTIVE_SUPPLIER_COUNT` in `FINANCE_ENRICHED_SV`, *Customer* is `REPRESENTS` → `CUSTOMERS_VIEW`, and both report `"validity":"VALID"`. Use the per-node read rather than `SYSTEM$GET_GLOSSARY_GRAPH` for this check, because the graph response can be truncated and may not list every representation.
 
 The ontology is complete and bound to your semantic views. Before an agent can use it, though, it has to appear in search, which is what the next step checks.
 
@@ -454,13 +461,13 @@ The diagram below shows what happens when a question comes in. The agent first s
 | B | `ENRICHED_AGENT` | 3 enriched SVs |
 | C | `BON_AGENT` | the same 3 enriched SVs + `business_ontology` search |
 
-The other five are used only by the full benchmark: `BARE_AGENT` (arm A, bare SVs), and the consistency pairs `FINANCE_AGENT` / `FINANCE_BON_AGENT` and `SALES_AGENT` / `SALES_BON_AGENT`.
+The other five are used only by the full benchmark: `BARE_AGENT` (arm A, bare SVs), and the consistency pairs `FINANCE_ENRICHED_AGENT` / `FINANCE_BON_AGENT` and `SALES_ENRICHED_AGENT` / `SALES_BON_AGENT`.
 
 **With CoCo instead:** let the skill generate and verify the spec:
 
 ```
 $business-ontology Create an agent that uses the ontology for Procurement, Finance & Controlling
-and Sales & Distribution, with tools for PURCHASING_ENRICHED_SV, FINANCE_ENRICHED_SV and
+and Sales & Distribution, with tools for PROCUREMENT_ENRICHED_SV, FINANCE_ENRICHED_SV and
 SALES_ENRICHED_SV in BUSINESS_ONTOLOGY.SAP.
 ```
 
@@ -492,12 +499,12 @@ instructions:
 tools:
   - tool_spec: {type: snowscope_search, name: business_ontology,
                 description: "Governed business terms, metrics, entities and policies."}
-  - tool_spec: {type: cortex_analyst_text_to_sql, name: query_purchasing, description: "..."}
+  - tool_spec: {type: cortex_analyst_text_to_sql, name: query_procurement, description: "..."}
   - tool_spec: {type: cortex_analyst_text_to_sql, name: query_finance,    description: "..."}
   - tool_spec: {type: cortex_analyst_text_to_sql, name: query_sales,      description: "..."}
 tool_resources:
   business_ontology: {corpus: businessOntology}
-  query_purchasing: {semantic_view: BUSINESS_ONTOLOGY.SAP.PURCHASING_ENRICHED_SV, ...}
+  query_procurement: {semantic_view: BUSINESS_ONTOLOGY.SAP.PROCUREMENT_ENRICHED_SV, ...}
   # query_finance, query_sales likewise
 ```
 
