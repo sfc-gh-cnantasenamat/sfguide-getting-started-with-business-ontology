@@ -168,6 +168,25 @@ sql/10_live_scenarios.sql     # optional, see Going Further
 > export SNOWFLAKE_DATABASE=MY_DB
 > ```
 
+> **Already have domains with these names?** Business Ontology domains are account-wide, not stored in a database, so another team may already use `Procurement`, `Finance & Controlling` or `Sales & Distribution`. Before Step 1, check **Catalog > Business Ontology (Preview)**. If any of the three names are taken, add a prefix to all three in the scripts and the benchmark before running them. This keeps your demo terms separate from anyone else's:
+>
+> ```bash
+> python3 - <<'EOF'
+> import pathlib, re
+> prefix = "Demo "
+> files = list(pathlib.Path("sql").glob("*.sql")) + [pathlib.Path("benchmark/run_benchmark.py")]
+> for f in files:
+>     t = f.read_text()
+>     for d in ["Procurement", "Finance & Controlling", "Sales & Distribution"]:
+>         t = t.replace(f"CREATE_GLOSSARY_DOMAIN('{d}'", f"CREATE_GLOSSARY_DOMAIN('{prefix}{d}'")
+>         t = t.replace(f'"domainName":"{d}"', f'"domainName":"{prefix}{d}"')
+>         t = re.sub(r"(['\"])" + re.escape(d) + r"\.", lambda m: m.group(1) + prefix + d + ".", t)
+>     f.write_text(t)
+> EOF
+> ```
+>
+> Then read every domain name in this guide with the prefix, for example `Demo Procurement.Supplier Count` in the Step 6 check.
+
 **Check:** the three enriched semantic views exist.
 
 ```sql
