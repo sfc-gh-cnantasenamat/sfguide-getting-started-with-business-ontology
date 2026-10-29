@@ -14,7 +14,21 @@ fork repo link: https://github.com/sfc-gh-cnantasenamat/getting-started-with-bus
 
 > **Private Preview:** Business Ontology must be enabled on your Snowflake account. In Snowsight, check **Catalog > Business Ontology (Preview)**. Contact your Snowflake account team to enable it. Behaviour, APIs and node kinds may change before general availability.
 
-This guide walks through the build used in the SAP supply-chain demo: three domain semantic views plus a Business Ontology (BON) that tells the agent what the business means. You build it in 10 steps. Each step runs one section of a companion script, shows the `$business-ontology` Cortex Code (CoCo) prompt that does the same thing, and ends with a check so you know the step worked.
+### The Problem
+
+Ask a simple question like "How many suppliers do we have?" and you might expect a simple answer. In most companies, though, there are several correct-looking numbers. The vendor master holds 15 vendor records, but one of them is a probationary vendor that procurement policy says doesn't count, so the official answer is 14. Both numbers are computed correctly. They just answer slightly different questions.
+
+People resolve this kind of ambiguity from experience: they know which number Finance reports, what "Tier A supplier" means at your company, and that you never cut a material that goes into something you sell. An AI agent doesn't have that experience. Given two plausible metrics, it may pick the wrong one, hedge with "15 or 14", or give different answers to different teams. Good semantic views help a lot, but each view describes one team's data. None of them is the place to decide which of two competing definitions is the official one.
+
+### The Solution
+
+Business Ontology (BON) is a governed layer of business meaning that sits above your semantic views. It doesn't replace them: the semantic views still compute every number. The ontology records what each business word means, which metric is canonical and which is only a look-alike, which policies apply, and how concepts connect across domains. A domain owner approves each definition, and the agent looks it up before it queries data.
+
+### What It Looks Like in Practice
+
+With the ontology in place, the agent searches for "supplier count" first, finds the approved definition that says probationary vendors are excluded, queries the semantic view metric that implements it, and answers 14. It also names the definition it used, so anyone can check the answer. When the definition changes, a steward updates it once in the ontology, and every agent that consults it follows, with no edits to semantic views or prompts.
+
+In this guide, you build exactly that on a synthetic SAP supply-chain dataset: three domain semantic views plus an ontology covering Procurement, Finance & Controlling, and Sales & Distribution. You build it in 10 steps. Each step runs one section of a companion script, shows the `$business-ontology` Cortex Code (CoCo) prompt that does the same thing, and ends with a check so you know the step worked. At the end, you compare two otherwise identical agents, one with the ontology and one without, to see what it adds.
 
 ### What You'll Learn
 
@@ -58,6 +72,8 @@ All objects live in `DB_ONTOLOGY_CONTROL_PLANE.SAP_BON_V2`.
 
 **Snowsight:** **Catalog > Business Ontology (Preview) > Generate Ontology** creates a domain and lets you add terms interactively. Use CoCo for bulk work, importing from semantic views, and agent setup.
 
+Before you build anything, it helps to be clear on what Business Ontology is and how it differs from the semantic views you may already have, so that's where we start.
+
 ## What Is Business Ontology
 
 Business Ontology is the governed meaning layer in Horizon Catalog. It models shared business meaning as a connected graph of **terms, metrics and entities**, organised into **domains**, linked by **typed relationships**, and tied to the Snowflake objects that implement them through **representations**. Only approved items are visible to agents.
@@ -73,6 +89,15 @@ Business Ontology is the governed meaning layer in Horizon Catalog. It models sh
 
 The SV still computes the number. BON makes the agent pick the right one and say why.
 
+### Two Kinds of Authority
+
+Most of the decisions in this guide follow from one division of labour:
+
+- **The semantic view is the computation authority.** The SQL that produces a number lives in the view. A formula recorded in the ontology is documentation and a cross-check, not the calculation.
+- **The ontology is the meaning authority.** When two correct metrics compete for the same business word, the ontology is where you say which one is official, and why.
+
+That's also why a good ontology definition *decides* rather than just describes. "Number of suppliers" describes. "The official supplier count used in all reporting; probationary vendors are excluded; the vendor record count is an operational variant, not the official count" decides, and that sentence is what turns an agent's "it depends" into an answer.
+
 ### What Goes Where
 
 | Put it in the **Semantic View** | Put it in **Business Ontology** |
@@ -83,6 +108,8 @@ The SV still computes the number. BON makes the agent pick the right one and say
 | Verified queries | Cross-domain chains (Sales → BOM → Procurement cost) and who approved each definition |
 
 **Don't** create one ontology metric for every SV metric. Create ontology nodes where meaning is contested, company-specific or cross-domain. The SV computes; BON decides and explains.
+
+With that mental model in place, the next section explains how the 10 build steps are laid out, so you know what to expect from each one.
 
 ## How This Guide Works
 
@@ -99,6 +126,8 @@ Pick one way per step. Running both the script and the prompt drafts every node 
 > **Keep one worksheet session.** Steps 1 to 6 approve drafts with the session-scoped form of `SYSTEM$APPROVE_ALL_GLOSSARY_TERMS`, which approves only what the current session drafted. Run them all in the same worksheet. If you switch sessions, approve by term ID instead (Step 6 shows both forms).
 
 If you already have semantic views of your own, read **Bootstrap from Semantic Views** under **Going Further** after you finish: the import covers Step 2, and Steps 3 to 5 fill the gaps it can't infer.
+
+Now that you know the shape of each step, you set up the demo data and the semantic views that the ontology will sit on top of.
 
 ## Set Up the Demo
 
@@ -139,6 +168,8 @@ SHOW SEMANTIC VIEWS IN SCHEMA DB_ONTOLOGY_CONTROL_PLANE.SAP_BON_V2;
 
 Expected: `PURCHASING_ENRICHED_SV`, `FINANCE_ENRICHED_SV` and `SALES_ENRICHED_SV` (plus the bare views from `03`).
 
+With the data and semantic views in place, you're ready to build the ontology itself, starting with the domains that hold everything else.
+
 ## Create Domains
 
 **Step 1 of 10.** A domain groups the nodes one business area owns.
@@ -155,6 +186,8 @@ Describe each one's scope and its accountable business owner.
 Underneath: `SYSTEM$CREATE_GLOSSARY_DOMAIN('Procurement')`. Domains are created immediately and don't need approval. The API can't set owners and stewards yet, so record stewardship in the domain description. Domains can't be renamed yet, so choose names carefully.
 
 **Check:** **Catalog > Business Ontology (Preview)** lists Procurement, Finance & Controlling and Sales & Distribution.
+
+The domains are empty containers for now. Next, you fill them with entities, the business objects that everything else connects to.
 
 ## Add Entities
 
@@ -176,6 +209,8 @@ Add Sales Order, Customer and Pricing Condition to Sales & Distribution.
 Underneath: `SYSTEM$DRAFT_GLOSSARY_TERM('{"name":"Supplier","domainName":"Procurement","itemKind":"ENTITY","description":"..."}')`. The skill shows each draft before it writes it.
 
 **Check:** all 39 statements succeed, and each returns the new draft's term ID. Drafts are not yet visible to agents or in the approved term list; that changes in Step 5.
+
+Entities give the ontology its nouns. Next come the metrics that measure them, which is where most of the conflicts the ontology resolves actually live.
 
 ## Add Metrics
 
@@ -210,6 +245,8 @@ Notes:
 
 **Check:** none until approval. Step 6 reads back the *Supplier Count* formula.
 
+Metrics settle which number is official. Terms and policies add the company vocabulary and the business rules that the data alone doesn't spell out.
+
 ## Add Terms and Policies
 
 **Step 4 of 10.** **Terms** decode codes and capture company vocabulary. **Policies** are rules the agent must apply.
@@ -243,6 +280,8 @@ $business-ontology Add these policies:
 > **Scale code fields with one term per field, not one per value.** Inline only the values that business rules depend on. Keep the full code list in a reference table joined in the SV, and link the term to it with a `REFERENCE_DATA` representation. New code values arrive through ETL. The term changes only when the *rule* changes.
 
 **Check:** none until approval (Step 6).
+
+Every node is now drafted. Next, you approve the drafts and connect them with typed relationships, so the ontology becomes a connected graph rather than a list.
 
 ## Define Relationships
 
@@ -293,6 +332,8 @@ Underneath: `SYSTEM$CREATE_GLOSSARY_RELATIONSHIP('Procurement.Tier A Supplier','
 
 **Check:** all 51 relationship statements succeed. A statement that fails usually names a node that isn't approved yet, so rerun the approve statement and try again.
 
+With nodes and relationships in place, take a moment to confirm that everything is approved and counted correctly before you connect it to data.
+
 ## Approve and Verify
 
 **Step 6 of 10.** Drafts are invisible to agents until they are approved. If you followed Step 5, everything is already approved; this step confirms it.
@@ -324,6 +365,8 @@ SELECT PARSE_JSON(SYSTEM$GET_GLOSSARY_TERM('Procurement.Supplier Count')):formul
 ```
 
 Expected: 19, 12 and 9 nodes (40 in total), and a formula that excludes probationary vendors. To inspect edges, `SYSTEM$GET_GLOSSARY_GRAPH('Procurement')` returns the approved graph (drafts are absent; use `SYSTEM$GET_GLOSSARY_DRAFT_GRAPH()` for those). The graph for one domain also includes edges to neighbouring domains, so its counts won't add up to exactly 51.
+
+The ontology now says what things mean. Next, you tie each node to the Snowflake object that implements it, so the agent knows where to compute each answer.
 
 ## Add Representations
 
@@ -363,6 +406,8 @@ SELECT SYSTEM$CREATE_GLOSSARY_ASSOCIATION('Procurement.On-Time Delivery Rate',
 
 **Check:** all 43 statements succeed (19 for Procurement nodes, 14 for Finance & Controlling, 10 for Sales & Distribution). Each one reports `"validity":"VALID"` when you read it back in the `associations` array of `SYSTEM$GET_GLOSSARY_GRAPH('<domain>')`.
 
+The ontology is complete and bound to your semantic views. Before an agent can use it, though, it has to appear in search, which is what the next step checks.
+
 ## Confirm Search Indexing
 
 **Step 8 of 10.** Agents search an index, not the live glossary. **Indexing can take up to about 6 hours**, and deleted terms can keep appearing in results for a while after deletion.
@@ -377,6 +422,8 @@ cortex search object "tier a suppliers" --types=business-ontology
 **Check:** results show domain-qualified names such as `Procurement.Supplier Count` and `Procurement.Tier A Supplier`, with their kind and definition. If they don't, check that the terms are approved, that your role can read the domain, and that enough time has passed for indexing.
 
 > **Stop here until both searches pass.** You can do Step 9 while you wait, because creating agents doesn't need the index. Don't ask the agents questions or run the benchmark until the searches pass; the demo harness checks the same probes with `run_benchmark.py --check-index`.
+
+Once search can find your terms, or while you wait for it, you create the agents that put the ontology to work.
 
 ## Build the Agent
 
@@ -454,6 +501,8 @@ DESCRIBE AGENT DB_ONTOLOGY_CONTROL_PLANE.SAP_BON_V2.BON_AGENT;
 
 Expected: the `agent_spec` column contains `EnableSnowscopeBusinessOntologySearch` set to `true`, a tool of type `snowscope_search`, and `"corpus":"businessOntology"`. With CoCo, ask: `$business-ontology Verify the ontology settings on agent BON_AGENT`.
 
+Everything is built. The last step shows the difference the ontology makes, by asking two otherwise identical agents the same questions.
+
 ## Evaluate with A/B Tests
 
 **Step 10 of 10.** Compare two agents that are identical except for the ontology tool: `ENRICHED_AGENT` (B) and `BON_AGENT` (C). Start with a quick hands-on comparison, then run the full benchmark if you want numbers.
@@ -502,6 +551,8 @@ $business-ontology Using the approved nodes in Procurement, draft 10 evaluation 
 1 control a semantic view alone should answer, and 1 about a term that doesn't exist.
 For each, give the expected answer, the wrong-but-defensible answer, and the governing node.
 ```
+
+That completes the core build: an approved ontology, bound to semantic views, searched by an agent and measured against a baseline. The section that follows is optional.
 
 ## Going Further
 
@@ -556,6 +607,8 @@ Other entry points:
 | Knowledge in people's heads | `$business-ontology I need an ontology for procurement. We count suppliers excluding probationary vendors...` |
 | OWL / RDF / Turtle | Use the `business-ontology-owl-dev` skill |
 
+If any step didn't match its expected check, the table below maps common symptoms to their likely causes and fixes.
+
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
@@ -572,6 +625,8 @@ Other entry points:
 | `GET_GLOSSARY_TERM` error inside a query | The argument must be a constant | Pass a literal name or ID |
 | Representation points at a rebuilt view | No revalidation in preview | Re-run the drift check after SV changes |
 | `Invalid identifier` inside JSON | Unescaped single quote | Write `'` as `''` inside SQL string literals |
+
+For day-to-day work after this guide, the quick reference below collects the calls you used in one place.
 
 ## API Quick Reference
 
@@ -592,6 +647,8 @@ Gotchas:
 - Relationship calls use positional arguments.
 - Never call approve-all without arguments.
 
+When you're finished exploring, clean up the demo objects. Agents search every domain the caller can see, so leftover demo terms become noise for other agents in your account.
+
 ## Clean Up
 
 Delete the three demo domains first. A domain can't be deleted while it still contains terms, so the skill runs a cascade (representations, then relationships, then terms, then the domain) and asks for confirmation before deleting:
@@ -606,6 +663,8 @@ Repeat for Finance & Controlling and Sales & Distribution. Then drop the databas
 DROP DATABASE IF EXISTS DB_ONTOLOGY_CONTROL_PLANE;
 DROP WAREHOUSE IF EXISTS ONTOLOGY_WH;
 ```
+
+With the demo objects removed, here's a recap of what you built and where to go next.
 
 ## Conclusion And Resources
 
