@@ -133,7 +133,7 @@ Now that you know the shape of each step, you set up the demo data and the seman
 
 ## Set Up the Demo
 
-**Do:** clone or download the [companion repository](https://github.com/sfc-gh-cnantasenamat/getting-started-with-business-ontology), then run the first six scripts in `sql/` in order. Everything lives in the `BUSINESS_ONTOLOGY` database and runs on the `BUSINESS_ONTOLOGY_WH` warehouse, split across two schemas: `RAW` holds the synthetic SAP source tables, and `SAP` holds everything you build on top of them. `03_sap_schema.sql` clones the `RAW` tables into `SAP` and stops with an error if they are missing.
+Clone or download the [companion repository](https://github.com/sfc-gh-cnantasenamat/getting-started-with-business-ontology), then run the first six scripts in `sql/` in order. Everything lives in the `BUSINESS_ONTOLOGY` database and runs on the `BUSINESS_ONTOLOGY_WH` warehouse, split across two schemas: `RAW` holds the synthetic SAP source tables, and `SAP` holds everything you build on top of them. `03_sap_schema.sql` clones the `RAW` tables into `SAP` and stops with an error if they are missing.
 
 ```
 sql/01_setup.sql              # BUSINESS_ONTOLOGY database, RAW schema, BUSINESS_ONTOLOGY_WH warehouse
@@ -169,32 +169,6 @@ The scripts and the build steps are numbered separately, so the table below show
 | 10. Run A/B Tests | Questions to the agents in Snowsight, plus an optional Python benchmark |
 
 `10_live_scenarios.sql` isn't part of the build. It's covered in **Going Further**.
-
-> **Using a different database?** Every script uses `BUSINESS_ONTOLOGY`. To use your own name, replace it in all SQL files before running them, then set `SNOWFLAKE_DATABASE` (and `SNOWFLAKE_SCHEMA` if you rename `SAP`) for the benchmark and web app:
->
-> ```bash
-> grep -rl BUSINESS_ONTOLOGY sql | xargs sed -i.bak 's/BUSINESS_ONTOLOGY/MY_DB/g'
-> export SNOWFLAKE_DATABASE=MY_DB
-> ```
-
-> **Already have domains with these names?** Business Ontology domains are account-wide, not stored in a database, so another team may already use `Procurement`, `Finance & Controlling` or `Sales & Distribution`. Before Step 1, check **Catalog > Business Ontology (Preview)**. If any of the three names are taken, add a prefix to all three in the scripts and the benchmark before running them. This keeps your demo terms separate from anyone else's:
->
-> ```bash
-> python3 - <<'EOF'
-> import pathlib, re
-> prefix = "Demo "
-> files = list(pathlib.Path("sql").glob("*.sql")) + [pathlib.Path("benchmark/run_benchmark.py")]
-> for f in files:
->     t = f.read_text()
->     for d in ["Procurement", "Finance & Controlling", "Sales & Distribution"]:
->         t = t.replace(f"CREATE_GLOSSARY_DOMAIN('{d}'", f"CREATE_GLOSSARY_DOMAIN('{prefix}{d}'")
->         t = t.replace(f'"domainName":"{d}"', f'"domainName":"{prefix}{d}"')
->         t = re.sub(r"(['\"])" + re.escape(d) + r"\.", lambda m: m.group(1) + prefix + d + ".", t)
->     f.write_text(t)
-> EOF
-> ```
->
-> Then read every domain name in this guide with the prefix, for example `Demo Procurement.Supplier Count` in the Step 6 check.
 
 **Check:** the three enriched semantic views exist.
 
