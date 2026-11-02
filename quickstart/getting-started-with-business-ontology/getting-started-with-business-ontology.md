@@ -144,14 +144,31 @@ sql/05_bare_svs.sql           # CUSTOMERS_VIEW, BOM_EXPLOSION_VIEW, bare SVs (be
 sql/06_enriched_svs.sql       # PROCUREMENT / FINANCE / SALES _ENRICHED_SV
 ```
 
-The other four scripts build the ontology and the agents. Don't run them yet: each build step later in this guide tells you which section to run. Script numbers and step numbers are separate, so for example Steps 1 to 6 all use sections of script `07`, and Steps 8 and 10 don't run a script at all:
+With the data and semantic views in place, the remaining four scripts build everything else: the ontology, the links to your data, and the agents. Don't run them yet. Each one is a sequence of build steps rather than a single action, so the guide walks through them a section at a time:
 
 ```
-sql/07_ontology.sql           # Steps 1 to 6 (domains, nodes, approval, relationships): 3 domains, 40 nodes, 51 relationships
-sql/08_representations.sql    # Step 7: 43 representations
-sql/09_agents.sql             # Step 9: 7 agents
-sql/10_live_scenarios.sql     # optional, see Going Further
+sql/07_ontology.sql           # 3 domains, 40 nodes, 51 relationships
+sql/08_representations.sql    # 43 representations
+sql/09_agents.sql             # 7 agents
+sql/10_live_scenarios.sql     # optional change-management scenarios
 ```
+
+The scripts and the build steps are numbered separately, so the table below shows which script each build step uses. Steps 1 to 6 all work through `07_ontology.sql` in order, and two steps don't run a script at all.
+
+| Build step | What you run |
+|---|---|
+| 1. Create Domains | `07_ontology.sql`: the `Domains` section |
+| 2. Add Entities | `07_ontology.sql`: the three node sections |
+| 3. Add Metrics | Nothing new; Step 2 already drafted them |
+| 4. Terms and Policies | Nothing new; Step 2 drafted them, except *Tier A Supplier*, which comes in Step 5 |
+| 5. Define Relationships | `07_ontology.sql`: an approve statement, the `Relationships` section, then the last section |
+| 6. Approve and Verify | A check query only |
+| 7. Add Representations | All of `08_representations.sql` |
+| 8. Confirm Search Indexing | Two search commands, no script |
+| 9. Build the Agent | All of `09_agents.sql` |
+| 10. Run A/B Tests | Questions to the agents in Snowsight, plus an optional Python benchmark |
+
+`10_live_scenarios.sql` isn't part of the build. It's covered in **Going Further**.
 
 > **Using a different database?** Every script uses `BUSINESS_ONTOLOGY`. To use your own name, replace it in all SQL files before running them, then set `SNOWFLAKE_DATABASE` (and `SNOWFLAKE_SCHEMA` if you rename `SAP`) for the benchmark and web app:
 >
