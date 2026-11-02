@@ -144,10 +144,10 @@ sql/05_bare_svs.sql           # CUSTOMERS_VIEW, BOM_EXPLOSION_VIEW, bare SVs (be
 sql/06_enriched_svs.sql       # PROCUREMENT / FINANCE / SALES _ENRICHED_SV
 ```
 
-The remaining scripts are what Steps 1 to 10 run, section by section. Don't run them yet:
+The other four scripts build the ontology and the agents. Don't run them yet: each build step later in this guide tells you which section to run. Script numbers and step numbers are separate, so for example Steps 1 to 6 all use sections of script `07`, and Steps 8 and 10 don't run a script at all:
 
 ```
-sql/07_ontology.sql           # Steps 1 to 6: 3 domains, 40 nodes, 51 relationships
+sql/07_ontology.sql           # Steps 1 to 6 (domains, nodes, approval, relationships): 3 domains, 40 nodes, 51 relationships
 sql/08_representations.sql    # Step 7: 43 representations
 sql/09_agents.sql             # Step 9: 7 agents
 sql/10_live_scenarios.sql     # optional, see Going Further
