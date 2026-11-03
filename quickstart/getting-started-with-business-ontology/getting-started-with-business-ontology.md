@@ -30,6 +30,8 @@ In this guide, you build exactly that on a synthetic SAP supply-chain dataset: t
 - How to configure a Cortex Agent to search the ontology before it queries data
 - How to measure what the ontology adds with a fair A/B test
 
+Those are the skills. Here's the concrete result they produce.
+
 ### What You'll Build
 
 By the end of this guide, your account holds the objects below: three domains of governed nodes, the relationships and representations that connect them to each other and to your data, and the semantic views and agents that put them to work. The counts are the same ones the **Check** lines confirm along the way.
@@ -49,6 +51,8 @@ By the end of this guide, your account holds the objects below: three domains of
 All objects live in `BUSINESS_ONTOLOGY.SAP`.
 
 > **Policies:** the demo stores policies as `itemKind: POLICY_CONCEPT`. The public docs currently document only `TERM`, `METRIC` and `ENTITY`, and the other kinds are not guaranteed to be stable in preview. If you need to stay on documented kinds, model a policy as a `TERM` named "... Policy" and link it with `APPLIES_TO`.
+
+With the end result in mind, check that you have everything needed to build it.
 
 ### What You'll Need
 
@@ -87,6 +91,8 @@ The picture below shows the same question asked twice. On the left, the agent ha
 
 The SV still computes the number. The ontology makes the agent pick the right one and say why.
 
+That split between computing a number and deciding what it means is worth spelling out, because the rest of the guide builds on it.
+
 ### Views Compute, Ontology Decides
 
 Most of the decisions in this guide follow from one division of labour:
@@ -95,6 +101,8 @@ Most of the decisions in this guide follow from one division of labour:
 - **The ontology is the meaning authority.** When two correct metrics compete for the same business word, the ontology is where you say which one is official, and why.
 
 That's also why a good ontology definition *decides* rather than just describes. "Number of suppliers" describes. "The official supplier count used in all reporting; probationary vendors are excluded; the vendor record count is an operational variant, not the official count" decides, and that sentence is what turns an agent's "it depends" into an answer.
+
+With that rule in mind, here's how it plays out when you decide where a piece of business knowledge belongs.
 
 ### What Goes Where
 
@@ -224,7 +232,7 @@ Entities give the ontology its nouns. Next come the metrics that measure them, w
 
 ## 3. Add Metrics
 
-This is where most of the value comes from. For each metric, write down which number is canonical, and **also add the defensible-but-wrong look-alike** as its own node that says it is not the canonical one. That gives the agent something to tell apart.
+For each metric, write down which number is canonical, and **also add the defensible-but-wrong look-alike** as its own node that says it is not the canonical one. That gives the agent something to tell apart.
 
 There's nothing new to run here, because Step 2 already drafted all 16 metrics. Instead, read them in `07_ontology.sql` to see the pattern, for example *Supplier Count* next to *Vendor Record Count*, and *Revenue* next to *Gross Bookings*.
 
@@ -543,6 +551,8 @@ In Snowsight, open **AI & ML > Agents**, and ask `ENRICHED_AGENT` and then `BON_
 
 **Check:** `BON_AGENT` gives the correct answer and names the governed term and metric it used, for example `Procurement.Supplier Count` implemented by `ACTIVE_SUPPLIER_COUNT`. `ENRICHED_AGENT` may give the right number on some runs, but it can also pick the look-alike or hedge ("15 or 14"), and it has no governed term to cite. Because agents vary from run to run, ask each question two or three times.
 
+Two questions show the difference. To measure it properly, across many questions and repeated runs, the demo includes a benchmark.
+
 ### Run the Benchmark
 
 This part is optional and needs the Python requirements in **What You'll Need**. The benchmark asks 20 questions across four tiers, with ground truth in `sql/04_ground_truth.sql`.
@@ -560,6 +570,8 @@ SNOWFLAKE_CONNECTION_NAME=<conn> python -u benchmark/run_benchmark.py --arms B,C
 ```
 
 **Check:** the results usually show the gains clustered in a small number of contested questions, with controls tied. That pattern tells you the ontology is working where it should. In the demo's final run, the enriched semantic views alone scored 71/80 (89%) and the same views plus Business Ontology scored 80/80 (100%), with both tied on the control tier. The misses clustered in a few contested questions, so read the result as a gain in consistency and traceability, not as a general accuracy figure. The companion repository's README has the full scorecard.
+
+The benchmark measures this demo. When you build an ontology for your own data, you'll want an evaluation of your own, designed the same way.
 
 ### Design Your Own
 
@@ -581,7 +593,7 @@ That completes the core build: an approved ontology, bound to semantic views, se
 
 ## Going Further
 
-The 10 steps are complete. These sections are optional: keeping the ontology current, and starting from semantic views you already have.
+The first part shows how to keep the ontology current as definitions change. The second shows how to start a new ontology from semantic views you already have.
 
 ### Update the Ontology
 
@@ -598,6 +610,8 @@ Once the ontology is live, most changes take a single prompt. The table lists co
 Edits to **ACTIVE** nodes go through an **edit card** (`SYSTEM$DRAFT_GLOSSARY_TERM_UPDATE`). The live definition stays in force until the edit is approved, and agents see the change only after the index refreshes. The skill's quality gate shows the old and new values side by side.
 
 To practise change management on the demo, `sql/10_live_scenarios.sql` contains optional scenarios that edit the ontology and show how the agents respond. For example, a steward changes the official supplier definition, and every BON-enabled agent follows without any edit to a semantic view or agent spec. Each edit must wait for the search index to refresh (up to about 6 hours) before you ask the agents again.
+
+Updating assumes the ontology already exists, as yours does now. If you're starting a new ontology on top of semantic views you already have, the skill can draft much of it for you.
 
 ### Bootstrap from Semantic Views
 
@@ -711,6 +725,8 @@ Congratulations! You've built a governed Business Ontology on top of three well-
 - How representations link ontology nodes to the semantic view metrics that implement them
 - How to configure a Cortex Agent with `snowscope_search` over the `businessOntology` corpus
 - How to evaluate ontology uplift with controls, repeat runs and hedge-aware scoring
+
+To go deeper on any of these, the resources below are a good place to start.
 
 ### Related Resources
 
