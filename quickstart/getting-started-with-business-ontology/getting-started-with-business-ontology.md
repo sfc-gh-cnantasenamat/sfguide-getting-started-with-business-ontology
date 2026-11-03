@@ -64,7 +64,7 @@ Here's what you need before you start. Everything in the table is required excep
 |---|---|
 | Account | Business Ontology enabled (Private Preview); search indexing enabled in your region |
 | Snowsight | **Catalog > Business Ontology (Preview)**, and a SQL worksheet to run the scripts |
-| Role | A role with ontology privileges. Domains use READ / SUGGEST / MODIFY / OWNERSHIP. The demo used ACCOUNTADMIN. |
+| Role | One role for the whole guide, used as your primary role. It needs `CREATE ONTOLOGY DOMAIN` on the account to create the three domains (`ACCOUNTADMIN` has it by default), plus the usual privileges to create a database, warehouse, semantic views and agents. The role that creates a domain owns it, so it can then draft, approve and link nodes, and search them. The demo used ACCOUNTADMIN. |
 | Data | The [companion repository](https://github.com/sfc-gh-cnantasenamat/getting-started-with-business-ontology), which contains the synthetic SAP data, the semantic views, the ontology, the agents and the benchmark |
 | CoCo | Cortex Code Desktop or CLI, for the prompts and the search check. The `$business-ontology` skill is bundled, so no install is needed. |
 | Python (optional) | Python 3.10+ and `snowflake-connector-python`, only for the full benchmark in Step 10 |
@@ -95,7 +95,7 @@ The SV still computes the number. The ontology makes the agent pick the right on
 
 That split between computing a number and deciding what it means is worth spelling out, because the rest of the guide builds on it.
 
-### Views Compute, Ontology Decides
+### How Semantic Views and the Ontology Divide the Work
 
 Most of the decisions in this guide follow from one division of labour:
 
@@ -145,6 +145,8 @@ Now that you know the shape of each step, you set up the demo data and the seman
 
 Clone or download the [companion repository](https://github.com/sfc-gh-cnantasenamat/getting-started-with-business-ontology), then run the first six scripts in `sql/` in order. Everything lives in the `BUSINESS_ONTOLOGY` database and runs on the `BUSINESS_ONTOLOGY_WH` warehouse, split across two schemas: `RAW` holds the synthetic SAP source tables, and `SAP` holds everything you build on top of them. `03_sap_schema.sql` clones the `RAW` tables into `SAP` and stops with an error if they are missing.
 
+If you'd rather work in a notebook, the repository also has the same SQL as two Snowflake notebooks, split at the indexing wait. `part_1_build_ontology.ipynb` covers this setup and Steps 1 to 7, and `part_2_agents_and_tests.ipynb` covers Steps 8 to 10. Each notebook section has the same name as the matching step here, with a short explanation above every cell, so you can follow either one. Upload them to a Snowflake Workspace and run the cells from top to bottom. For this setup, that's the seven cells under **0. Demo Setup** in Part 1, from `setup` to `check_setup`.
+
 ```
 sql/01_setup.sql              # BUSINESS_ONTOLOGY database, RAW schema, BUSINESS_ONTOLOGY_WH warehouse
 sql/02_raw_data.sql           # 15 SAP tables + synthetic data in RAW
@@ -154,39 +156,36 @@ sql/05_bare_svs.sql           # CUSTOMERS_VIEW, BOM_EXPLOSION_VIEW, bare SVs (be
 sql/06_enriched_svs.sql       # PROCUREMENT / FINANCE / SALES _ENRICHED_SV
 ```
 
-With the data and semantic views in place, the remaining four scripts build everything else: the ontology, the links to your data, and the agents. Don't run them yet. Each one is a sequence of build steps rather than a single action, so the guide walks through them a section at a time:
+With the data and semantic views in place, the remaining three scripts build everything else: the ontology, the links to your data, and the agents. Don't run them yet. Each one is a sequence of build steps rather than a single action, so the guide walks through them a section at a time:
 
 ```
 sql/07_ontology.sql           # 3 domains, 40 nodes, 51 relationships
 sql/08_representations.sql    # 43 representations
 sql/09_agents.sql             # 7 agents
-sql/10_live_scenarios.sql     # optional change-management scenarios
 ```
 
-The scripts and the build steps are numbered separately, so the table below shows which script each build step uses. Steps 1 to 6 all work through `07_ontology.sql` in order, and two steps don't run a script at all.
+The scripts and the build steps are numbered separately, so the table below shows which script each build step uses, and which notebook cells hold the same SQL. Steps 1 to 6 all work through `07_ontology.sql` in order, and two steps don't run a script at all.
 
-| Build step | What you run |
-|---|---|
-| 1. Create Domains | `07_ontology.sql`: the `Domains` section |
-| 2. Add Entities | `07_ontology.sql`: the three node sections |
-| 3. Add Metrics | Nothing new; Step 2 already drafted them |
-| 4. Terms and Policies | Nothing new; Step 2 drafted them, except *Tier A Supplier*, which comes in Step 5 |
-| 5. Define Relationships | `07_ontology.sql`: an approve statement, the `Relationships` section, then the last section |
-| 6. Approve and Verify | A check query only |
-| 7. Add Representations | All of `08_representations.sql` |
-| 8. Confirm Search Indexing | Two search commands, no script |
-| 9. Build the Agent | All of `09_agents.sql` |
-| 10. Run A/B Tests | Questions to the agents in Snowsight, plus an optional Python benchmark |
+| Build step | What you run | In the notebooks |
+|---|---|---|
+| 1. Create Domains | `07_ontology.sql`: the `Domains` section | Part 1, `domains` |
+| 2. Add Entities | `07_ontology.sql`: the three node sections | Part 1, `nodes` |
+| 3. Add Metrics | Nothing new; Step 2 already drafted them | Part 1, explanation only |
+| 4. Terms and Policies | Nothing new; Step 2 drafted them, except *Tier A Supplier*, which comes in Step 5 | Part 1, explanation only |
+| 5. Define Relationships | `07_ontology.sql`: an approve statement, the `Relationships` section, then the last section | Part 1, `approve_nodes`, `relationships`, `tier_a_supplier` |
+| 6. Approve and Verify | A check query only | Part 1, `check_nodes`, `check_formula` |
+| 7. Add Representations | All of `08_representations.sql` | Part 1, `representations`, `check_representations` |
+| 8. Confirm Search Indexing | Two search commands, no script | Part 2, the commands to run in a terminal |
+| 9. Build the Agent | All of `09_agents.sql` | Part 2, `agents`, `check_agent` |
+| 10. Run A/B Tests | Questions to the agents in Snowsight, plus an optional Python benchmark | Part 2, `enriched_suppliers`, `enriched_revenue`, `bon_suppliers`, `bon_revenue` |
 
-`10_live_scenarios.sql` isn't part of the build. It's covered in **Going Further**.
-
-**Check:** the three enriched semantic views exist.
+**Check:** confirm the setup worked by listing the semantic views in the `SAP` schema. Scripts `05` and `06` each create three, so you should see six.
 
 ```sql
 SHOW SEMANTIC VIEWS IN SCHEMA BUSINESS_ONTOLOGY.SAP;
 ```
 
-Expected: `PROCUREMENT_ENRICHED_SV`, `FINANCE_ENRICHED_SV` and `SALES_ENRICHED_SV` (plus the three bare semantic views from `05`).
+Expected: six rows. The three enriched views, `PROCUREMENT_ENRICHED_SV`, `FINANCE_ENRICHED_SV` and `SALES_ENRICHED_SV`, are the ones the rest of the guide uses. The three bare views, `PROCUREMENT_BARE_SV`, `FINANCE_BARE_SV` and `SALES_BARE_SV`, are used only by the optional benchmark. If any are missing, rerun the script that creates them, `05_bare_svs.sql` or `06_enriched_svs.sql`.
 
 With the data and semantic views in place, you're ready to build the ontology itself, starting with the domains that hold everything else.
 
@@ -194,7 +193,7 @@ With the data and semantic views in place, you're ready to build the ontology it
 
 A domain groups the nodes one business area owns.
 
-To create the domains, open `sql/07_ontology.sql` and run the `Domains` section (the three `SYSTEM$CREATE_GLOSSARY_DOMAIN` statements).
+To create the domains, open `sql/07_ontology.sql` and run the `Domains` section (the three `SYSTEM$CREATE_GLOSSARY_DOMAIN` statements). In the Part 1 notebook, that's the `domains` cell under **1. Create Domains**.
 
 **With CoCo instead:**
 
@@ -213,7 +212,7 @@ The domains are empty containers for now. Next, you fill them with entities, the
 
 Entities are the business objects that metrics measure. Describe them in business language, and name the key that identifies them.
 
-Back in `07_ontology.sql`, run the three node sections (`Procurement nodes`, `Finance & Controlling nodes`, `Sales & Distribution nodes`), stopping at the `Approve` comment. The script is organised by domain, so this one run drafts the entities, metrics, terms and policies for Steps 2 to 4 together: 39 drafts. Steps 3 and 4 explain the metrics, terms and policies you just drafted and have nothing extra to run.
+Back in `07_ontology.sql`, run the three node sections (`Procurement nodes`, `Finance & Controlling nodes`, `Sales & Distribution nodes`), stopping at the `Approve` comment. In the Part 1 notebook, the `nodes` cell under **2. Add Entities** runs the same statements. The script is organised by domain, so this one run drafts the entities, metrics, terms and policies for Steps 2 to 4 together: 39 drafts. Steps 3 and 4 explain the metrics, terms and policies you just drafted and have nothing extra to run.
 
 **With CoCo instead:**
 
@@ -322,6 +321,8 @@ Relationships connect nodes with typed edges. Use the most specific type. Direct
 
 In `07_ontology.sql`, work through three actions in this order. Relationship calls refer to nodes by name, so the nodes must be approved first.
 
+In the Part 1 notebook, these are the three cells under **5. Define Relationships**: `approve_nodes`, `relationships` and `tier_a_supplier`.
+
 1. Approve the 39 drafts from Step 2 (this session only):
 
    ```sql
@@ -360,7 +361,7 @@ With nodes and relationships in place, take a moment to confirm that everything 
 
 Drafts are invisible to agents until they are approved. If you followed Step 5, everything is already approved; this step confirms it.
 
-Start by running the check below. If any counts are short, approve the remaining drafts with one of these forms:
+Start by running the check below, which is the `check_nodes` and `check_formula` cells under **6. Approve and Verify** in the Part 1 notebook. If any counts are short, approve the remaining drafts with one of these forms:
 
 ```sql
 -- Approve specific drafts, or everything from this session. Never call with no arguments:
@@ -408,7 +409,7 @@ The table lists the same roles, with how many of each the demo creates.
 | `DESCRIBES` | term → column | 7 |
 | `REFERENCE_DATA` | term → code table (T077K, T023T) | 2 |
 
-Run all of `sql/08_representations.sql`, which contains 43 `SYSTEM$CREATE_GLOSSARY_ASSOCIATION` statements.
+Run all of `sql/08_representations.sql`, which contains 43 `SYSTEM$CREATE_GLOSSARY_ASSOCIATION` statements. In the Part 1 notebook, that's the `representations` cell under **7. Add Representations**, followed by the `check_representations` cell for the check below. This is the last section of Part 1.
 
 **With CoCo instead:**
 
@@ -454,7 +455,7 @@ cortex search object "tier a suppliers" --types=business-ontology
 
 **Check:** results show domain-qualified names such as `Procurement.Supplier Count` and `Procurement.Tier A Supplier`, with their kind and definition. If they don't, check that the terms are approved, that your role can read the domain, and that enough time has passed for indexing.
 
-> **Stop here until both searches pass.** You can do Step 9 while you wait, because creating agents doesn't need the index. Don't ask the agents questions or run the benchmark until the searches pass; the demo harness checks the same probes with `run_benchmark.py --check-index`.
+> **Stop here until both searches pass.** Creating the agents in Step 9 doesn't need the index, so you can run it while you wait. The notebooks keep it in Part 2 so that everything after the wait starts from one place; either order works. Don't ask the agents questions or run the benchmark until the searches pass; the demo harness checks the same probes with `run_benchmark.py --check-index`.
 
 Once search can find your terms, or while you wait for it, you create the agents that put the ontology to work.
 
@@ -466,7 +467,7 @@ The diagram below shows what happens when a question comes in. The agent first s
 
 ![How the agent uses the ontology](assets/agent.png)
 
-Run all of `sql/09_agents.sql`. It creates 7 agents with the same model, budget and core instructions. Agents with Business Ontology (BON) search turned on have `BON` in their name, such as `BON_AGENT`. The two you use for the A/B comparison are:
+Run all of `sql/09_agents.sql`, or the `agents` cell under **9. Build the Agent** in the Part 2 notebook. It creates 7 agents with the same model, budget and core instructions. Agents with Business Ontology (BON) search turned on have `BON` in their name, such as `BON_AGENT`. The two you use for the A/B comparison are:
 
 | Arm | Agent | Tools |
 |---|---|---|
@@ -544,7 +545,7 @@ Compare two agents that are identical except for the ontology tool: `ENRICHED_AG
 
 ### Try It
 
-In Snowsight, open **AI & ML > Agents**, and ask `ENRICHED_AGENT` and then `BON_AGENT` the same two questions from the benchmark. For each question, the table gives the answer the ontology makes official and the look-alike answer an agent without it may give.
+In Snowsight, open **AI & ML > Agents**, and ask `ENRICHED_AGENT` and then `BON_AGENT` the same two questions from the benchmark. In the Part 2 notebook, the four cells under **10. Run A/B Tests** ask the same questions for you, one agent and question per cell. For each question, the table gives the answer the ontology makes official and the look-alike answer an agent without it may give.
 
 | Question | Correct answer | Defensible-but-wrong answer |
 |---|---|---|
@@ -611,8 +612,6 @@ Once the ontology is live, most changes take a single prompt. The table lists co
 
 Edits to **ACTIVE** nodes go through an **edit card** (`SYSTEM$DRAFT_GLOSSARY_TERM_UPDATE`). The live definition stays in force until the edit is approved, and agents see the change only after the index refreshes. The skill's quality gate shows the old and new values side by side.
 
-To practise change management on the demo, `sql/10_live_scenarios.sql` contains optional scenarios that edit the ontology and show how the agents respond. For example, a steward changes the official supplier definition, and every BON-enabled agent follows without any edit to a semantic view or agent spec. Each edit must wait for the search index to refresh (up to about 6 hours) before you ask the agents again.
-
 Updating assumes the ontology already exists, as yours does now. If you're starting a new ontology on top of semantic views you already have, the skill can draft much of it for you.
 
 ### Bootstrap from Semantic Views
@@ -661,10 +660,11 @@ Each row starts from what you see, then gives the most likely cause and the fix.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `Unknown function SYSTEM$CREATE_GLOSSARY_DOMAIN` | Feature not enabled | Contact your account team |
+| `Insufficient privileges ... must have CREATE ONTOLOGY DOMAIN` | Your primary role can't create top-level domains | `USE ROLE` a role that has it, or have an admin run `GRANT CREATE ONTOLOGY DOMAIN ON ACCOUNT TO ROLE <role>`. Secondary roles don't count |
 | A relationship statement fails | A node it names is still a draft | Approve the drafts (Step 5, action 1), then rerun the statement |
 | Node counts in Step 6 are short | Drafts made in another session | Approve by term ID, or ask CoCo to show and approve your drafts |
 | Agent never calls `business_ontology` | Flag, type or corpus misspelled (accepted silently) | `DESCRIBE AGENT` and check all three settings |
-| Search returns nothing for new terms | Terms still in draft, or not yet indexed | Approve them, then wait up to about 6 hours and re-probe |
+| Search returns nothing for new terms | Terms still in draft, not yet indexed, or the searching role can't read the domain | Approve them, wait up to about 6 hours, and re-probe with a role that has `READ` (or higher) on the domain |
 | Deleted or renamed terms still returned | Stale index | Wait for re-index; don't benchmark until probes are clean |
 | Agent still picks the look-alike metric | No look-alike node, or the definition doesn't say "NOT ..." | Add the look-alike as its own metric that says it isn't canonical; add the policy |
 | Agent can't follow a cross-domain link | The link exists only as a graph edge | Also state the bridge in the definition text, since search doesn't return edges |
