@@ -70,7 +70,7 @@ Before you build anything, it helps to be clear on what Business Ontology is and
 
 ## What Is Business Ontology
 
-Business Ontology (BON) is the governed meaning layer in Horizon Catalog. It models shared business meaning as a connected graph of **terms, metrics and entities**, organised into **domains**, linked by **typed relationships**, and tied to the Snowflake objects that implement them through **representations**. Only approved items are visible to agents.
+Business Ontology is the governed meaning layer in Horizon Catalog. It models shared business meaning as a connected graph of **terms, metrics and entities**, organised into **domains**, linked by **typed relationships**, and tied to the Snowflake objects that implement them through **representations**. Only approved items are visible to agents.
 
 **Semantic Views tell Snowflake *how* to compute a metric. Business Ontology tells everyone *what* that metric means, *which* one is canonical, *who* approved it, and *whether* teams agree.**
 
@@ -85,7 +85,7 @@ The picture below shows the same question asked twice. On the left, the agent ha
 
 ![Semantic views alone compared with semantic views plus Business Ontology](assets/comparison.png)
 
-The SV still computes the number. BON makes the agent pick the right one and say why.
+The SV still computes the number. The ontology makes the agent pick the right one and say why.
 
 ### Views Compute, Ontology Decides
 
@@ -107,7 +107,7 @@ As a rule of thumb, anything about *how* to compute a number belongs in the sema
 | Synonyms that only help text-to-SQL | Policies that constrain how metrics are used (exclusions, sign rules, what must not be cut) |
 | Verified queries | Cross-domain chains (Sales → BOM → Procurement cost) and who approved each definition |
 
-**Don't** create one ontology metric for every SV metric. Create ontology nodes where meaning is contested, company-specific or cross-domain. The SV computes; BON decides and explains.
+**Don't** create one ontology metric for every SV metric. Create ontology nodes where meaning is contested, company-specific or cross-domain. The SV computes; the ontology decides and explains.
 
 With that mental model in place, the next section explains how the 10 build steps are laid out, so you know what to expect from each one.
 
@@ -456,7 +456,7 @@ The diagram below shows what happens when a question comes in. The agent first s
 
 ![How the agent uses the ontology](assets/agent.png)
 
-**Do:** run all of `sql/09_agents.sql`. It creates 7 agents with the same model, budget and core instructions. The two you use for the A/B comparison are:
+**Do:** run all of `sql/09_agents.sql`. It creates 7 agents with the same model, budget and core instructions. Agents with Business Ontology (BON) search turned on have `BON` in their name, such as `BON_AGENT`. The two you use for the A/B comparison are:
 
 | Arm | Agent | Tools |
 |---|---|---|
