@@ -127,11 +127,12 @@ The diagram below shows the 10 build steps in order. The blue steps (metrics, te
 
 ![End-to-end process](assets/steps.png)
 
-Each of the 10 steps has the same parts:
+Each of the 10 steps has the same parts, and all but the first are subsections under the step's heading:
 
 - **What to run:** each step opens by telling you the one thing to do, which is usually to run a named section of a companion script in a Snowsight SQL worksheet. Running the scripts reproduces the demo exactly: the same 40 nodes, 51 relationships and 43 representations that the benchmark results depend on.
-- **With CoCo instead:** the `$business-ontology` prompt that builds the same thing through the skill. The prompts are shortened for reading. Use them to learn the workflow and to build an ontology on your own data. If you use them here, your ontology will differ from the demo and so may your results.
-- **Check:** a query or command with the expected result. Don't move on until it matches.
+- **Use CoCo:** a subsection with an alternative to the script. A short sentence explains what the prompt in the box below it asks the `$business-ontology` skill to do, so you can paste the prompt into Cortex Code (CoCo) instead of running the script section. The prompts are shortened for reading. Use them to learn the workflow and to build an ontology on your own data. If you use them here, your ontology will differ from the demo and so may your results.
+- **The SQL Behind It:** where it appears, a subsection showing the system function that both the script and the prompt call, with notes on how it behaves. It's for reference; you don't run it separately.
+- **Check:** a subsection that says what to look at once the step has run, where to find it, the exact result you should see, and what to do if it doesn't match. When the check runs a query, an **Expected** subsection under it gives the result. Don't move on until it matches.
 
 Pick one way per step. Running both the script and the prompt drafts every node twice.
 
@@ -147,6 +148,8 @@ Clone or download the [companion repository](https://github.com/sfc-gh-cnantasen
 
 If you'd rather work in a notebook, the repository also has the same SQL as two Snowflake notebooks, split at the indexing wait. `part_1_build_ontology.ipynb` covers this setup and Steps 1 to 7, and `part_2_agents_and_tests.ipynb` covers Steps 8 to 10. Each notebook section has the same name as the matching step here, with a short explanation above every cell, so you can follow either one. Upload them to a Snowflake Workspace and run the cells from top to bottom. For this setup, that's the seven cells under **0. Demo Setup** in Part 1, from `setup` to `check_setup`.
 
+The list below shows the six setup scripts in the order you run them, with a comment after each one saying what it creates. Run each file in full in a Snowsight SQL worksheet before you open the next one.
+
 ```
 sql/01_setup.sql              # BUSINESS_ONTOLOGY database, RAW schema, BUSINESS_ONTOLOGY_WH warehouse
 sql/02_raw_data.sql           # 15 SAP tables + synthetic data in RAW
@@ -156,7 +159,7 @@ sql/05_bare_svs.sql           # CUSTOMERS_VIEW, BOM_EXPLOSION_VIEW, bare SVs (be
 sql/06_enriched_svs.sql       # PROCUREMENT / FINANCE / SALES _ENRICHED_SV
 ```
 
-With the data and semantic views in place, the remaining three scripts build everything else: the ontology, the links to your data, and the agents. Don't run them yet. Each one is a sequence of build steps rather than a single action, so the guide walks through them a section at a time:
+With the data and semantic views in place, the remaining three scripts build everything else: the ontology, the links to your data, and the agents. Don't run them yet. Each one is a sequence of build steps rather than a single action, so the guide walks through them a section at a time. The list below shows the three scripts and what each one builds, so you can recognise them when the steps refer to them:
 
 ```
 sql/07_ontology.sql           # 3 domains, 40 nodes, 51 relationships
@@ -179,42 +182,64 @@ The scripts and the build steps are numbered separately, so the table below show
 | 9. Build the Agent | All of `09_agents.sql` | Part 2, `agents`, `check_agent` |
 | 10. Run A/B Tests | Questions to the agents in Snowsight, plus an optional Python benchmark | Part 2, `enriched_suppliers`, `enriched_revenue`, `bon_suppliers`, `bon_revenue` |
 
-**Check:** confirm the setup worked by listing the semantic views in the `SAP` schema. Scripts `05` and `06` each create three, so you should see six.
+Before you build anything on top of the setup, it's worth confirming that it worked.
+
+### Check
+
+A semantic view (SV) describes a set of tables in business terms, with metrics and dimensions an agent can query. Scripts `05` and `06` each create three of them, so listing the semantic views in the `SAP` schema should show six. Run the statement below in a SQL worksheet.
 
 ```sql
 SHOW SEMANTIC VIEWS IN SCHEMA BUSINESS_ONTOLOGY.SAP;
 ```
 
-Expected: six rows. The three enriched views, `PROCUREMENT_ENRICHED_SV`, `FINANCE_ENRICHED_SV` and `SALES_ENRICHED_SV`, are the ones the rest of the guide uses. The three bare views, `PROCUREMENT_BARE_SV`, `FINANCE_BARE_SV` and `SALES_BARE_SV`, are used only by the optional benchmark. If any are missing, rerun the script that creates them, `05_bare_svs.sql` or `06_enriched_svs.sql`.
+#### Expected
+
+The statement returns six rows, one per semantic view. The three enriched views, `PROCUREMENT_ENRICHED_SV`, `FINANCE_ENRICHED_SV` and `SALES_ENRICHED_SV`, are the ones the rest of the guide uses. The three bare views, `PROCUREMENT_BARE_SV`, `FINANCE_BARE_SV` and `SALES_BARE_SV`, are used only by the optional benchmark. If any are missing, rerun the script that creates them, `05_bare_svs.sql` or `06_enriched_svs.sql`.
 
 With the data and semantic views in place, you're ready to build the ontology itself, starting with the domains that hold everything else.
 
 ## 1. Create Domains
 
-A domain groups the nodes one business area owns.
+A domain is a container for one business area, such as Procurement. It groups the nodes that area owns, where a node is any entry in the ontology: an entity, a metric, a term or a policy. The demo uses three domains, one for each part of the business the questions touch.
 
 To create the domains, open `sql/07_ontology.sql` and run the `Domains` section (the three `SYSTEM$CREATE_GLOSSARY_DOMAIN` statements). In the Part 1 notebook, that's the `domains` cell under **1. Create Domains**.
 
-**With CoCo instead:**
+If you'd rather describe what you want in plain language than run SQL, you can build the same domains with Cortex Code.
+
+### Use CoCo
+
+To create the domains through the skill, paste the prompt below into CoCo. It asks the skill to create the three domains and write a description for each one that states its scope and its accountable business owner.
 
 ```
 $business-ontology Create three domains: Procurement, Finance & Controlling, Sales & Distribution.
 Describe each one's scope and its accountable business owner.
 ```
 
-Underneath: `SYSTEM$CREATE_GLOSSARY_DOMAIN('Procurement')`. Domains are created immediately and don't need approval. The API can't set owners and stewards yet, so record stewardship in the domain description. Domains can't be renamed yet, so choose names carefully.
+Whichever way you choose, the same SQL function does the work, and knowing it helps when you read the script or debug an error.
 
-**Check:** **Catalog > Business Ontology (Preview)** lists Procurement, Finance & Controlling and Sales & Distribution.
+### The SQL Behind It
+
+Both the script and the prompt call this function underneath. One call looks like `SYSTEM$CREATE_GLOSSARY_DOMAIN('Procurement')`, and you don't need to run it separately. Domains are created immediately and don't need approval. The API can't set owners and stewards yet, so record stewardship in the domain description. Domains can't be renamed yet, so choose names carefully.
+
+With the domains created, confirm that all three are there before you add anything to them.
+
+### Check
+
+First, look at the result of each of the three statements: each should return without an error. Then, in Snowsight, open **Catalog > Business Ontology (Preview)** and look at the list of domains. You should see three new domains named exactly Procurement, Finance & Controlling and Sales & Distribution, each with no nodes yet. If a statement fails with an `Insufficient privileges` error, your primary role is missing `CREATE ONTOLOGY DOMAIN` (see **Troubleshooting**). If a domain is missing from the list, rerun its statement.
 
 The domains are empty containers for now. Next, you fill them with entities, the business objects that everything else connects to.
 
 ## 2. Add Entities
 
-Entities are the business objects that metrics measure. Describe them in business language, and name the key that identifies them.
+Entities are the business objects that metrics measure, such as a supplier, a material or a customer. Each one is described in business language, so a reader who doesn't know the tables can still understand it, and names the key column that identifies it.
 
-Back in `07_ontology.sql`, run the three node sections (`Procurement nodes`, `Finance & Controlling nodes`, `Sales & Distribution nodes`), stopping at the `Approve` comment. In the Part 1 notebook, the `nodes` cell under **2. Add Entities** runs the same statements. The script is organised by domain, so this one run drafts the entities, metrics, terms and policies for Steps 2 to 4 together: 39 drafts. Steps 3 and 4 explain the metrics, terms and policies you just drafted and have nothing extra to run.
+Back in `07_ontology.sql`, run the three node sections (`Procurement nodes`, `Finance & Controlling nodes`, `Sales & Distribution nodes`), stopping at the `Approve` comment. In the Part 1 notebook, the `nodes` cell under **2. Add Entities** runs the same statements. The script is organised by domain, so this one run drafts the entities, metrics, terms and policies for Steps 2 to 4 together: 39 drafts. A draft is a node that has been written but not yet approved, so agents can't use it yet. Steps 3 and 4 explain the metrics, terms and policies you just drafted and have nothing extra to run.
 
-**With CoCo instead:**
+As in Step 1, you can draft the entities with a prompt instead of the script.
+
+### Use CoCo
+
+To draft the entities through the skill, paste the prompt below into CoCo. It lists each entity by domain, with a business description and, for *Supplier*, the key that identifies it and the vendors it excludes. The skill turns each line into a draft node.
 
 ```
 $business-ontology Add these entities to Procurement:
@@ -225,19 +250,31 @@ Add AP Line Item and Cost Posting to Finance & Controlling.
 Add Sales Order, Customer and Pricing Condition to Sales & Distribution.
 ```
 
-Underneath: `SYSTEM$DRAFT_GLOSSARY_TERM('{"name":"Supplier","domainName":"Procurement","itemKind":"ENTITY","description":"..."}')`. The skill shows each draft before it writes it.
+Each entity becomes one call to the function below.
 
-**Check:** all 39 statements succeed, and each returns the new draft's term ID. Drafts are not yet visible to agents or in the approved term list; that changes in Step 5.
+### The SQL Behind It
+
+Both the script and the prompt call this function underneath. One call looks like `SYSTEM$DRAFT_GLOSSARY_TERM('{"name":"Supplier","domainName":"Procurement","itemKind":"ENTITY","description":"..."}')`, and you don't need to run it separately. The skill shows each draft before it writes it.
+
+Because this one run drafts 39 nodes at once, check that every statement worked before you move on.
+
+### Check
+
+Look at the result of each statement as it runs. All 39 should succeed, and each one returns the ID of the draft it created. If any statement returns an error, fix the cause and rerun only that statement, because rerunning the whole section drafts the other nodes twice. The drafts don't appear in **Catalog > Business Ontology (Preview)**, in the approved term list or to agents yet. That's expected, and it changes when you approve them in Step 5.
 
 Entities give the ontology its nouns. Next come the metrics that measure them, which is where most of the conflicts the ontology resolves actually live.
 
 ## 3. Add Metrics
 
-For each metric, write down which number is canonical, and **also add the defensible-but-wrong look-alike** as its own node that says it is not the canonical one. That gives the agent something to tell apart.
+A metric is a number the business reports, such as a supplier count or revenue. Many questions have more than one plausible answer: "how many suppliers" could mean all vendor records or only the active ones. So for each metric, the ontology records which number is canonical, meaning the official one, and **also adds the defensible-but-wrong look-alike** as its own node that says it is not the canonical one. That gives the agent both options to tell apart, instead of only the one it might stumble on.
 
 There's nothing new to run here, because Step 2 already drafted all 16 metrics. Instead, read them in `07_ontology.sql` to see the pattern, for example *Supplier Count* next to *Vendor Record Count*, and *Revenue* next to *Gross Bookings*.
 
-**With CoCo instead:**
+To see how the same metrics are described in plain language, look at the prompt below, which drafts them with the skill.
+
+### Use CoCo
+
+To draft the metrics through the skill, paste the prompt below into CoCo. It gives each canonical metric with its formula and, next to it, the look-alike metric that says it is not the canonical one, so the skill drafts both as separate nodes.
 
 ```
 $business-ontology Add these metrics to Procurement:
@@ -252,27 +289,38 @@ $business-ontology Add these metrics to Procurement:
 - Procurement Spend, BOM Cost Rollup
 ```
 
-The same pattern applies in the other domains:
+The prompt covers Procurement only, but every domain follows the same canonical and look-alike pattern, and a few rules apply to all metrics.
+
+### Metric Notes
+
+The other two domains contain these metrics:
 
 - **Finance & Controlling:** COGS Raw Materials, COGS Freight, Cost Center Total, Product Gross Margin, Customer Profit, Break-even Discount.
 - **Sales & Distribution:** Revenue (net of discounts) versus Gross Bookings (NOT revenue), Customer Discounts, Revenue at Risk.
 
-Notes:
+Keep these rules in mind when you read or write a metric:
+
 - `formula` is **descriptive**, not executable. The agent computes numbers with the SV metric and uses the formula to check it (see Step 9). Write it so a reviewer can see the rule: the numerator, the denominator, the filter and the grain.
 - Only `METRIC` nodes carry `formula`. The formula is returned by `SYSTEM$GET_GLOSSARY_TERM`, not by graph or list reads.
 - **Cross-domain metrics are the exception.** No single SV computes *Product Gross Margin* or *Revenue at Risk*. Their definitions must name each component and the bridge between domains (for example, "sold assembly → BOM components → material standard cost"), because the agent combines those components itself.
 
-**Check:** none until approval. Step 6 reads back the *Supplier Count* formula.
+### Check
+
+There's nothing to check yet, because the metrics are still drafts and can't be read back as approved nodes. Step 6 confirms them: it counts the approved nodes in each domain and reads back the *Supplier Count* formula, which should exclude probationary vendors.
 
 Metrics settle which number is official. Terms and policies add the company vocabulary and the business rules that the data alone doesn't spell out.
 
 ## 4. Terms and Policies
 
-**Terms** decode codes and capture company vocabulary. **Policies** are rules the agent must apply.
+Data often holds codes that mean nothing to a newcomer, such as `ZPRB` for a probationary vendor, and companies have their own vocabulary, such as "Tier A supplier". **Terms** decode those codes and capture that vocabulary. **Policies** are business rules the agent must apply, such as leaving probationary vendors out of supplier counts.
 
 There's nothing new to run here either: Step 2 drafted 7 of the 8 terms and all 3 policies. The eighth term, *Tier A Supplier*, is added at the end of Step 5, because the script adds it in its own section after the relationships.
 
-**With CoCo instead:**
+The prompts below show the same terms and policies in plain language.
+
+### Use CoCo
+
+To draft the terms and policies through the skill, paste the two prompts below into CoCo, one at a time. The first drafts the terms. Each line names a term, the code field it decodes, and the code values that business rules depend on.
 
 ```
 $business-ontology Add these terms:
@@ -286,6 +334,8 @@ Finance & Controlling: Posting Key (31 = invoice, 34 = credit memo), GL Account,
 Sales & Distribution: Condition Type (PR00 base, K007 customer discount, KF00 freight), Sales Organization
 ```
 
+Once the terms are drafted, paste the second prompt, which drafts the three policies. Each line names the domain and the policy, followed by the rule the agent must apply.
+
 ```
 $business-ontology Add these policies:
 - Procurement / Probationary Vendor Exclusion: probationary vendors are excluded from supplier
@@ -296,15 +346,21 @@ $business-ontology Add these policies:
   production input and must not be cut to reduce spend.
 ```
 
+The *Vendor Account Group* term lists only three code values, even though real code fields can have hundreds. The tip below explains why.
+
+### Scaling Code Fields
+
 > **Scale code fields with one term per field, not one per value.** Inline only the values that business rules depend on. Keep the full code list in a reference table joined in the SV, and link the term to it with a `REFERENCE_DATA` representation. New code values arrive through ETL. The term changes only when the *rule* changes.
 
-**Check:** none until approval (Step 6).
+### Check
+
+There's nothing to check yet, because the terms and policies are still drafts. Step 6 confirms that every node in all three domains, including these, is approved and counted.
 
 Every node is now drafted. Next, you approve the drafts and connect them with typed relationships, so the ontology becomes a connected graph rather than a list.
 
 ## 5. Define Relationships
 
-Relationships connect nodes with typed edges. Use the most specific type. Direction is source → target, except `IS_A`, which runs instance or subtype → class. The table lists each type, when to use it, and an example from the demo.
+So far the nodes are a list. Relationships connect them into a graph, with an edge, or link, between two nodes. Each edge has a type that says how the nodes relate, for example that *Supplier Count* `MEASURES` *Supplier*. Use the most specific type that fits. An edge runs from a source node to a target node, except `IS_A`, which runs from the instance or subtype to the class. The table lists each type, when to use it, and an example from the demo.
 
 | Type | Use for | Demo example |
 |---|---|---|
@@ -319,11 +375,11 @@ Relationships connect nodes with typed edges. Use the most specific type. Direct
 | `RELATED_TO` | only when nothing else fits | used sparingly |
 | `CUSTOM` | only on explicit request, and needs a label | Not used in the demo |
 
-In `07_ontology.sql`, work through three actions in this order. Relationship calls refer to nodes by name, so the nodes must be approved first.
+In `07_ontology.sql`, work through the three actions below in this order. Relationship calls refer to nodes by name, and only approved nodes can be found by name, so the first action approves the drafts.
 
 In the Part 1 notebook, these are the three cells under **5. Define Relationships**: `approve_nodes`, `relationships` and `tier_a_supplier`.
 
-1. Approve the 39 drafts from Step 2 (this session only):
+1. Approve the 39 drafts from Step 2. The statement below approves every draft that this worksheet session created, and nothing drafted in other sessions, so the nodes exist as approved terms before the relationships refer to them:
 
    ```sql
    SELECT SYSTEM$APPROVE_ALL_GLOSSARY_TERMS('[]', 'ACTIVE', '{"sessionId":"CURRENT_SESSION"}');
@@ -332,7 +388,11 @@ In the Part 1 notebook, these are the three cells under **5. Define Relationship
 2. Run the `Relationships` section: 49 `SYSTEM$CREATE_GLOSSARY_RELATIONSHIP` statements.
 3. Run the last section, `Added for benchmark Q19`, in three parts: the *Tier A Supplier* draft, then the approve statement above again, then its two relationships. That makes 40 nodes and 51 relationships.
 
-**With CoCo instead:**
+If you're using CoCo instead, the prompt below defines the relationships for you.
+
+### Use CoCo
+
+To define the relationships through the skill, paste the prompt below into CoCo. It names a few relationships explicitly, using domain-qualified names and the relationship types from the table above, then asks the skill to propose the rest for you to review.
 
 ```
 $business-ontology Define these relationships (use domain-qualified names):
@@ -345,23 +405,39 @@ $business-ontology Define these relationships (use domain-qualified names):
 Then find more relationships I missed in each domain.
 ```
 
+Whichever way you created them, it helps to see what the relationships look like as a picture.
+
+### The Resulting Graph
+
 The graph below shows a slice of what you just created. Each box is a node, coloured by kind (entities white, metrics blue, terms purple, policies red), and each arrow is a typed relationship. Notice how *Revenue* in Sales & Distribution and *BOM Cost Rollup* in Procurement both feed *Product Gross Margin* in Finance & Controlling: those two `DERIVES` edges are the cross-domain bridge.
 
 ![A slice of the demo graph](assets/relationships.png)
 
-Underneath: `SYSTEM$CREATE_GLOSSARY_RELATIONSHIP('Procurement.Tier A Supplier','Procurement.Supplier','IS_A')`. That call writes directly. `SYSTEM$DRAFT_GLOSSARY_RELATIONSHIP(...)` followed by approval routes the edge through review. Both calls accept domain-qualified names or term IDs.
+Each arrow in that picture comes from one call to the function below.
+
+### The SQL Behind It
+
+Both the script and the prompt call this function underneath. One call looks like `SYSTEM$CREATE_GLOSSARY_RELATIONSHIP('Procurement.Tier A Supplier','Procurement.Supplier','IS_A')`, and you don't need to run it separately. That call creates the edge straight away. If you want someone to review an edge first, use `SYSTEM$DRAFT_GLOSSARY_RELATIONSHIP(...)` instead and approve it afterwards. Both calls accept domain-qualified names or term IDs.
+
+The graph is useful to people, but the agent doesn't read it directly, which affects how you write your definitions.
+
+### What the Agent Sees
 
 > **Important:** agent search results **do not include relationships**. The agent follows links by reading definitions. Graph edges are for governance, lineage and the catalog. Any link the agent must follow, especially a cross-domain bridge, must **also** be stated in the description text.
 
-**Check:** all 51 relationship statements succeed. A statement that fails usually names a node that isn't approved yet, so rerun the approve statement and try again.
+With that in mind, confirm that the three actions worked.
+
+### Check
+
+Look at the results of the three actions. Both approve statements should succeed, and all 51 relationship statements (49 in the `Relationships` section and 2 for *Tier A Supplier*) should return without an error. A relationship statement that fails usually names a node that isn't approved yet, so rerun the approve statement and then rerun only the failed relationship. In **Catalog > Business Ontology (Preview)**, the nodes now appear in their domains, and opening *Supplier Count* shows its `MEASURES` link to *Supplier*.
 
 With nodes and relationships in place, take a moment to confirm that everything is approved and counted correctly before you connect it to data.
 
 ## 6. Approve and Verify
 
-Drafts are invisible to agents until they are approved. If you followed Step 5, everything is already approved; this step confirms it.
+Agents can only use approved nodes, so a draft that was missed is invisible to them. If you followed Step 5, everything is already approved, and this step confirms it before you go further.
 
-Start by running the check below, which is the `check_nodes` and `check_formula` cells under **6. Approve and Verify** in the Part 1 notebook. If any counts are short, approve the remaining drafts with one of these forms:
+Start by running the queries in the **Check** below, which are the `check_nodes` and `check_formula` cells under **6. Approve and Verify** in the Part 1 notebook. If any counts are short, approve the remaining drafts with one of the two forms below. The first approves only the drafts whose term IDs you list, which works from any session. The second approves every draft from the current session, the same statement you ran in Step 5:
 
 ```sql
 -- Approve specific drafts, or everything from this session. Never call with no arguments:
@@ -370,13 +446,21 @@ SELECT SYSTEM$APPROVE_ALL_GLOSSARY_TERMS('["<termId1>","<termId2>"]');
 SELECT SYSTEM$APPROVE_ALL_GLOSSARY_TERMS('[]', 'ACTIVE', '{"sessionId":"CURRENT_SESSION"}');
 ```
 
-**With CoCo instead:**
+If you'd rather have CoCo find any leftover drafts for you, use the prompt below instead of the SQL above.
+
+### Use CoCo
+
+To find and approve any remaining drafts through the skill, paste the prompt below into CoCo. It lists the drafts this session created, so you can review them before the skill approves them.
 
 ```
 $business-ontology Show all drafts I created this session and approve them.
 ```
 
-**Check:** approved node counts per domain, and the formula on one metric.
+Either way, the check below tells you whether anything is still missing.
+
+### Check
+
+Run the two queries below. The first counts the approved nodes in each domain, and the second reads back the formula of the *Supplier Count* metric.
 
 ```sql
 SELECT 'Procurement' AS domain, ARRAY_SIZE(PARSE_JSON(SYSTEM$GET_GLOSSARY_TERM_LIST('Procurement')):terms) AS nodes
@@ -387,13 +471,17 @@ UNION ALL SELECT 'Sales & Distribution', ARRAY_SIZE(PARSE_JSON(SYSTEM$GET_GLOSSA
 SELECT PARSE_JSON(SYSTEM$GET_GLOSSARY_TERM('Procurement.Supplier Count')):formula::STRING;
 ```
 
-Expected: 19, 12 and 9 nodes (40 in total), and a formula that excludes probationary vendors. To inspect edges, `SYSTEM$GET_GLOSSARY_GRAPH('Procurement')` returns the approved graph (drafts are absent; use `SYSTEM$GET_GLOSSARY_DRAFT_GRAPH()` for those). The graph for one domain also includes edges to neighbouring domains, and large graphs can come back truncated, so its counts won't add up to exactly 51.
+#### Expected
+
+The first query returns three rows, with 19 nodes for Procurement, 12 for Finance & Controlling and 9 for Sales & Distribution (40 in total). The second returns one row with the *Supplier Count* formula, which should count distinct vendor numbers and exclude vendors in the probationary account group. If a count is short, some drafts are still unapproved, so approve them with one of the forms above and run the check again. If the formula comes back empty, the node is still a draft.
+
+If you also want to look at the relationships, `SYSTEM$GET_GLOSSARY_GRAPH('Procurement')` returns the approved graph (drafts are absent; use `SYSTEM$GET_GLOSSARY_DRAFT_GRAPH()` for those). The graph for one domain also includes edges to neighbouring domains, and large graphs can come back truncated, so its counts won't add up to exactly 51.
 
 The ontology now says what things mean. Next, you tie each node to the Snowflake object that implements it, so the agent knows where to compute each answer.
 
 ## 7. Add Representations
 
-A representation records which Snowflake object implements a node. This is not just catalog decoration: the skill's agent builder reads approved SV representations to write each SV tool's description, and that description is how the agent chooses which view to query.
+The ontology now defines what each node means, but not where its data lives. A representation fills that gap: it records which Snowflake object, such as a table, a column or a semantic view metric, implements a node. This is not just catalog decoration. The skill's agent builder reads approved SV representations to write each SV tool's description, and that description is how the agent chooses which view to query.
 
 There are five representation roles, and each one links a particular kind of node to a particular kind of Snowflake object. The diagram below shows each pairing.
 
@@ -411,7 +499,11 @@ The table lists the same roles, with how many of each the demo creates.
 
 Run all of `sql/08_representations.sql`, which contains 43 `SYSTEM$CREATE_GLOSSARY_ASSOCIATION` statements. In the Part 1 notebook, that's the `representations` cell under **7. Add Representations**, followed by the `check_representations` cell for the check below. This is the last section of Part 1.
 
-**With CoCo instead:**
+As with the earlier steps, CoCo can add the representations from a prompt instead.
+
+### Use CoCo
+
+To add the representations through the skill, paste the prompt below into CoCo. It links one metric to its semantic view metric explicitly, then asks the skill to propose a representation for every other node and show them to you for review before it writes them.
 
 ```
 $business-ontology In Procurement, associate the metric Supplier Count with metric
@@ -420,7 +512,11 @@ BUSINESS_ONTOLOGY.SAP.PROCUREMENT_ENRICHED_SV as IMPLEMENTS.
 Then propose representations for every other node in all three domains and show them for review.
 ```
 
-Underneath:
+Each of the 43 representations comes from one call to the same function.
+
+### The SQL Behind It
+
+The script and the skill both call `SYSTEM$CREATE_GLOSSARY_ASSOCIATION`. The example below, one of the 43 statements, links the *On-Time Delivery Rate* metric to the `OPERATIONAL_OTD_RATE` metric on the `SHIPMENTS` logical table in `PROCUREMENT_ENRICHED_SV`, with the role `IMPLEMENTS`. You don't need to run it separately, because it is already in the script:
 
 ```sql
 SELECT SYSTEM$CREATE_GLOSSARY_ASSOCIATION('Procurement.On-Time Delivery Rate',
@@ -429,31 +525,43 @@ SELECT SYSTEM$CREATE_GLOSSARY_ASSOCIATION('Procurement.On-Time Delivery Rate',
   'IMPLEMENTS');
 ```
 
+One caution applies to representations after you create them:
+
 > In preview, representations are **not revalidated** when a semantic view is rebuilt, renamed or dropped, and there is no automatic drift detection between a definition and its implementation. After any SV change, re-check with `$business-ontology Find drift between ontology and semantic views`.
 
-**Check:** all 43 statements succeed (19 for Procurement nodes, 14 for Finance & Controlling, 10 for Sales & Distribution), and each call returns `"error":false`. Then read back a few representations from the node they belong to:
+Next, confirm that the representations were created and point at real objects.
+
+### Check
+
+Look at the result of each statement as it runs. All 43 should succeed (19 for Procurement nodes, 14 for Finance & Controlling and 10 for Sales & Distribution), and each result should contain `"error":false`. A result with `"error":true` usually means a node name or an object name is misspelled. Then read back the representations of two nodes, one metric and one entity:
 
 ```sql
 SELECT 'Supplier Count' AS node, TO_JSON(PARSE_JSON(SYSTEM$GET_GLOSSARY_TERM('Procurement.Supplier Count')):representedAs) AS representations
 UNION ALL SELECT 'Customer', TO_JSON(PARSE_JSON(SYSTEM$GET_GLOSSARY_TERM('Sales & Distribution.Customer')):representedAs);
 ```
 
-Expected: *Supplier Count* is `IMPLEMENTS` → `ACTIVE_SUPPLIER_COUNT` in `FINANCE_ENRICHED_SV`, *Customer* is `REPRESENTS` → `CUSTOMERS_VIEW`, and both report `"validity":"VALID"`. Use the per-node read rather than `SYSTEM$GET_GLOSSARY_GRAPH` for this check, because the graph response can be truncated and may not list every representation.
+#### Expected
+
+The query returns two rows. In the *Supplier Count* row, look for the role `IMPLEMENTS` pointing at the metric `ACTIVE_SUPPLIER_COUNT` in `FINANCE_ENRICHED_SV`. In the *Customer* row, look for the role `REPRESENTS` pointing at `CUSTOMERS_VIEW`. Both should report `"validity":"VALID"`. If a row is empty, its statement didn't run, and if validity isn't `VALID`, the object it points at is missing, so rerun Step 0 and then the statement. Use the per-node read rather than `SYSTEM$GET_GLOSSARY_GRAPH` for this check, because the graph response can be truncated and may not list every representation.
 
 The ontology is complete and bound to your semantic views. Before an agent can use it, though, it has to appear in search, which is what the next step checks.
 
 ## 8. Confirm Search Indexing
 
-Agents search an index, not the live glossary. **Indexing can take up to about 6 hours**, and deleted terms can keep appearing in results for a while after deletion.
+Agents don't read the ontology directly. They search an index, a searchable copy that Snowflake builds from your approved nodes in the background. **Indexing can take up to about 6 hours**, so a node you approved a moment ago may not be findable yet. Deleted terms can also keep appearing in results for a while after deletion.
 
-To check, run these searches from a terminal with the Cortex Code CLI:
+To find out whether the index is ready, run the two searches below in a terminal, using the Cortex Code command-line tool (CLI). Each one searches the Business Ontology index, the same index the agent uses, for one of the terms the benchmark depends on:
 
 ```bash
 cortex search object "supplier count" --types=business-ontology
 cortex search object "tier a suppliers" --types=business-ontology
 ```
 
-**Check:** results show domain-qualified names such as `Procurement.Supplier Count` and `Procurement.Tier A Supplier`, with their kind and definition. If they don't, check that the terms are approved, that your role can read the domain, and that enough time has passed for indexing.
+### Check
+
+Read the results that each search prints. The first should list `Procurement.Supplier Count`, and the second `Procurement.Tier A Supplier`, each shown with its kind (for example, `METRIC` or `TERM`) and its definition. If a search returns no objects, the index isn't ready yet or can't see your terms. Confirm that the Step 6 counts still match, that the role you search with can read the domain, and that enough time has passed, then search again.
+
+Because the agents depend on this index, the search result decides when you can move on.
 
 > **Stop here until both searches pass.** Creating the agents in Step 9 doesn't need the index, so you can run it while you wait. The notebooks keep it in Part 2 so that everything after the wait starts from one place; either order works. Don't ask the agents questions or run the benchmark until the searches pass; the demo harness checks the same probes with `run_benchmark.py --check-index`.
 
@@ -461,13 +569,13 @@ Once search can find your terms, or while you wait for it, you create the agents
 
 ## 9. Build the Agent
 
-The agent searches the ontology first, then queries the semantic view metric the definition points to.
+A Cortex Agent is an AI assistant in Snowflake that answers questions by calling tools, such as a semantic view it can query. In this step you create agents that also have a tool for searching the ontology, so they look up what a term means before they compute anything.
 
 The diagram below shows what happens when a question comes in. The agent first searches the ontology for each business term and gets back the canonical metric, any policies and the company vocabulary. It then computes the number with the semantic view metric that the definition names, combines results across domains when the metric spans more than one, and answers with the governed term cited.
 
 ![How the agent uses the ontology](assets/agent.png)
 
-Run all of `sql/09_agents.sql`, or the `agents` cell under **9. Build the Agent** in the Part 2 notebook. It creates 7 agents with the same model, budget and core instructions. Agents with Business Ontology (BON) search turned on have `BON` in their name, such as `BON_AGENT`. The two you use for the A/B comparison are:
+Run all of `sql/09_agents.sql`, or the `agents` cell under **9. Build the Agent** in the Part 2 notebook. It creates 7 agents with the same model, budget and core instructions. Agents with Business Ontology (BON) search turned on have `BON` in their name, such as `BON_AGENT`. An A/B comparison asks two versions of something the same questions to see which does better. The two agents you compare are:
 
 | Arm | Agent | Tools |
 |---|---|---|
@@ -476,7 +584,11 @@ Run all of `sql/09_agents.sql`, or the `agents` cell under **9. Build the Agent*
 
 The other five are used only by the full benchmark: `BARE_AGENT` (arm A, bare SVs), and the consistency pairs `FINANCE_ENRICHED_AGENT` / `FINANCE_BON_AGENT` and `SALES_ENRICHED_AGENT` / `SALES_BON_AGENT`.
 
-**With CoCo instead:** let the skill generate and verify the spec:
+If you're building an agent for your own data, CoCo can write the agent for you.
+
+### Use CoCo
+
+To build the agent through the skill, paste the first prompt below into CoCo. It asks the skill to write the agent spec, with one tool for each enriched semantic view and the ontology search turned on, and to check the three ontology settings before it creates the agent.
 
 ```
 $business-ontology Create an agent that uses the ontology for Procurement, Finance & Controlling
@@ -484,13 +596,17 @@ and Sales & Distribution, with tools for PROCUREMENT_ENRICHED_SV, FINANCE_ENRICH
 SALES_ENRICHED_SV in BUSINESS_ONTOLOGY.SAP.
 ```
 
-To add the ontology to an agent you already have (the change is additive and keeps your instructions):
+If you already have an agent, the second prompt below adds the ontology to it instead of creating a new one. The skill adds the search tool and the three settings, and keeps your existing tools and instructions:
 
 ```
 $business-ontology Add the ontology to agent BUSINESS_ONTOLOGY.SAP.ENRICHED_AGENT
 ```
 
-The core of the demo's `BON_AGENT` (full spec in `sql/09_agents.sql`):
+To understand what the script or the skill actually creates, it helps to read the agent's specification.
+
+### The Agent Spec
+
+Whichever way you build it, the spec below is the core of the demo's `BON_AGENT`, shortened for reading (the full spec is in `sql/09_agents.sql`). It's for reading, not running. It shows the ontology switch under `experimental`, the instructions that tell the agent to search the ontology before it queries data, and the four tools: one `business_ontology` search tool and one text-to-SQL tool for each enriched semantic view:
 
 ```yaml
 models:
@@ -521,7 +637,7 @@ tool_resources:
   # query_finance, query_sales likewise
 ```
 
-**`CREATE AGENT` does not validate these three settings.** A typo is accepted, and the agent then silently never searches the ontology:
+Three lines in that spec are what connect the agent to the ontology, and they need extra care. **`CREATE AGENT` does not validate these three settings.** A typo is accepted, and the agent then silently never searches the ontology:
 
 - `experimental.EnableSnowscopeBusinessOntologySearch: true`
 - `tool_spec.type: snowscope_search`
@@ -529,19 +645,25 @@ tool_resources:
 
 Note the different spellings: the CLI search type is `business-ontology`, while the agent corpus is `businessOntology`.
 
-**Check:** read the three settings back from `BON_AGENT`.
+That's why the check for this step reads the settings back from the agent you created.
+
+### Check
+
+Because `CREATE AGENT` accepts typos in the three settings above, confirm that they were saved correctly by describing `BON_AGENT`.
 
 ```sql
 DESCRIBE AGENT BUSINESS_ONTOLOGY.SAP.BON_AGENT;
 ```
 
-Expected: the `agent_spec` column contains `EnableSnowscopeBusinessOntologySearch` set to `true`, a tool of type `snowscope_search`, and `"corpus":"businessOntology"`. With CoCo, ask: `$business-ontology Verify the ontology settings on agent BON_AGENT`.
+#### Expected
+
+The statement returns one row. In its `agent_spec` column, look for three things: `EnableSnowscopeBusinessOntologySearch` set to `true`, a tool named `business_ontology` of type `snowscope_search`, and `"corpus":"businessOntology"` under that tool's resources. If any of them is missing or spelled differently, the agent will never search the ontology, so correct the spec in `09_agents.sql` and rerun it. If you used CoCo, you can ask it to do this check for you: `$business-ontology Verify the ontology settings on agent BON_AGENT`.
 
 Everything is built. The last step shows the difference the ontology makes, by asking two otherwise identical agents the same questions.
 
 ## 10. Run A/B Tests
 
-Compare two agents that are identical except for the ontology tool: `ENRICHED_AGENT` (B) and `BON_AGENT` (C). Start with a quick hands-on comparison, then run the full benchmark if you want numbers.
+In this step you compare two agents that are identical except for the ontology tool: `ENRICHED_AGENT` (B) and `BON_AGENT` (C). Because everything else is the same, any difference in their answers comes from the ontology. Start with a quick hands-on comparison, then run the full benchmark if you want numbers.
 
 ### Try It
 
@@ -552,15 +674,19 @@ In Snowsight, open **AI & ML > Agents**, and ask `ENRICHED_AGENT` and then `BON_
 | How many suppliers do we have? | 14 (active suppliers) | 15 (all vendor records, including probationary) |
 | What is our revenue? | 711,915 (net of K007 discounts) | 746,000 (gross bookings) |
 
-**Check:** `BON_AGENT` gives the correct answer and names the governed term and metric it used, for example `Procurement.Supplier Count` implemented by `ACTIVE_SUPPLIER_COUNT`. `ENRICHED_AGENT` may give the right number on some runs, but it can also pick the look-alike or hedge ("15 or 14"), and it has no governed term to cite. Because agents vary from run to run, ask each question two or three times.
+Once you have both agents' answers, compare them with the table.
+
+#### Check
+
+Compare the two agents' answers to each question against the table. `BON_AGENT` should give the correct answer, 14 suppliers and 711,915 in revenue, and name the governed term and metric it used, for example `Procurement.Supplier Count` implemented by `ACTIVE_SUPPLIER_COUNT`. `ENRICHED_AGENT` may give the right number on some runs, but it can also pick the look-alike or hedge ("15 or 14"), and it has no governed term to cite. Because agents vary from run to run, ask each question two or three times.
 
 Two questions show the difference. To measure it properly, across many questions and repeated runs, the demo includes a benchmark.
 
 ### Run the Benchmark
 
-This part is optional and needs the Python requirements in **What You'll Need**. The benchmark asks 20 questions across four tiers, with ground truth in `sql/04_ground_truth.sql`.
+This part is optional and needs the Python requirements in **What You'll Need**. The benchmark is a Python script that asks the agents 20 questions, grouped into four tiers, from controls that the semantic views alone can answer to questions that need cross-domain reasoning or governed definitions, and scores each answer against the correct one, called the ground truth, stored in `sql/04_ground_truth.sql`.
 
-From the repository root, run:
+From the repository root, run the commands below. The first installs the Snowflake Python connector the script needs. The second checks that the search index is ready, using the same probes as Step 8, and stops if it isn't. The third runs the full benchmark against arms B and C and prints the scorecard. Replace `<conn>` with the name of your Snowflake CLI connection:
 
 ```bash
 pip install snowflake-connector-python
@@ -572,7 +698,11 @@ SNOWFLAKE_CONNECTION_NAME=<conn> python -u benchmark/run_benchmark.py --check-in
 SNOWFLAKE_CONNECTION_NAME=<conn> python -u benchmark/run_benchmark.py --arms B,C --runs 3 --runs-hard 5
 ```
 
-**Check:** the results usually show the gains clustered in a small number of contested questions, with controls tied. That pattern tells you the ontology is working where it should. In the demo's final run, the enriched semantic views alone scored 71/80 (89%) and the same views plus Business Ontology scored 80/80 (100%), with both tied on the control tier. The misses clustered in a few contested questions, so read the result as a gain in consistency and traceability, not as a general accuracy figure. The companion repository's README has the full scorecard.
+A full run takes a while, because each question is asked several times. When it finishes, read the scorecard as described below.
+
+#### Check
+
+When the run finishes, look at the scorecard it prints, with accuracy per arm and per tier. Compare arm B (`ENRICHED_AGENT`) with arm C (`BON_AGENT`) tier by tier. The control tier should be tied, because the semantic views alone can answer those questions. Any gains should cluster in a small number of contested questions, the ones with a look-alike answer. That pattern tells you the ontology is working where it should. In the demo's final run, the enriched semantic views alone scored 71/80 (89%) and the same views plus Business Ontology scored 80/80 (100%), with both tied on the control tier. The misses clustered in a few contested questions, so read the result as a gain in consistency and traceability, not as a general accuracy figure. The companion repository's README has the full scorecard.
 
 The benchmark measures this demo. When you build an ontology for your own data, you'll want an evaluation of your own, designed the same way.
 
@@ -584,6 +714,8 @@ When you evaluate an ontology on your own data, follow the same rules the demo u
 - **Runs:** run each question several times, because agents vary from run to run. The demo used 3 runs, and 5 for the hard tiers.
 - **Scoring:** a hedged answer ("15 or 14") counts as wrong. Track accuracy, right on every run, hedging, and whether the answer cites a governed term.
 - **Starting point:** adapt `benchmark/run_benchmark.py` and the ground-truth tables.
+
+To get a first set of questions, paste the prompt below into CoCo. It asks the skill to draft 10 evaluation questions from your approved Procurement nodes, in the same mix of question types as the demo, each with its expected answer, its look-alike answer and the node that governs it:
 
 ```
 $business-ontology Using the approved nodes in Procurement, draft 10 evaluation questions:
@@ -615,6 +747,8 @@ Edits to **ACTIVE** nodes go through an **edit card** (`SYSTEM$DRAFT_GLOSSARY_TE
 Updating assumes the ontology already exists, as yours does now. If you're starting a new ontology on top of semantic views you already have, the skill can draft much of it for you.
 
 ### Bootstrap from Semantic Views
+
+To start that way, paste the prompt below into CoCo, with your own database and schema in place of `BUSINESS_ONTOLOGY.SAP`. It asks the skill to read the semantic views in that schema and propose a draft ontology from them for you to review:
 
 ```
 $business-ontology Bootstrap ontology from our semantic views in BUSINESS_ONTOLOGY.SAP
@@ -700,13 +834,13 @@ When you're finished exploring, clean up the demo objects. Agents search every d
 
 ## Clean Up
 
-Delete the three demo domains first. A domain can't be deleted while it still contains terms, so the skill runs a cascade (representations, then relationships, then terms, then the domain) and asks for confirmation before deleting:
+Delete the three demo domains first. A domain can't be deleted while it still contains terms, so the skill runs a cascade (representations, then relationships, then terms, then the domain) and asks for confirmation before deleting. Paste the prompt below into CoCo to delete the Procurement domain and everything in it:
 
 ```
 $business-ontology Delete the Procurement domain and all its contents
 ```
 
-Repeat for Finance & Controlling and Sales & Distribution. Then drop the database and warehouse that the setup scripts created:
+Repeat for Finance & Controlling and Sales & Distribution. Then run the two statements below in a SQL worksheet. They drop the `BUSINESS_ONTOLOGY` database, with its `RAW` and `SAP` schemas, the semantic views and the agents, and the `BUSINESS_ONTOLOGY_WH` warehouse that the setup scripts created:
 
 ```sql
 DROP DATABASE IF EXISTS BUSINESS_ONTOLOGY;
