@@ -141,7 +141,7 @@ If you already have semantic views of your own, read **Bootstrap from Semantic V
 
 Now that you know the shape of each step, you set up the demo data and the semantic views that the ontology will sit on top of.
 
-## Set Up the Demo
+## 0. Demo Setup
 
 Clone or download the [companion repository](https://github.com/sfc-gh-cnantasenamat/getting-started-with-business-ontology), then run the first six scripts in `sql/` in order. Everything lives in the `BUSINESS_ONTOLOGY` database and runs on the `BUSINESS_ONTOLOGY_WH` warehouse, split across two schemas: `RAW` holds the synthetic SAP source tables, and `SAP` holds everything you build on top of them. `03_sap_schema.sql` clones the `RAW` tables into `SAP` and stops with an error if they are missing.
 
