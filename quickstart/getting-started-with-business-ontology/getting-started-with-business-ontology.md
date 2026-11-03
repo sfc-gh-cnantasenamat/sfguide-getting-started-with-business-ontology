@@ -119,7 +119,7 @@ The diagram below shows the 10 build steps in order. The blue steps (metrics, te
 
 Each of the 10 steps has the same parts:
 
-- **Do:** the one action to take. It runs a named section of a companion script in a Snowsight SQL worksheet. Running the scripts reproduces the demo exactly: the same 40 nodes, 51 relationships and 43 representations that the benchmark results depend on.
+- **What to run:** each step opens by telling you the one thing to do, which is usually to run a named section of a companion script in a Snowsight SQL worksheet. Running the scripts reproduces the demo exactly: the same 40 nodes, 51 relationships and 43 representations that the benchmark results depend on.
 - **With CoCo instead:** the `$business-ontology` prompt that builds the same thing through the skill. The prompts are shortened for reading. Use them to learn the workflow and to build an ontology on your own data. If you use them here, your ontology will differ from the demo and so may your results.
 - **Check:** a query or command with the expected result. Don't move on until it matches.
 
@@ -184,7 +184,7 @@ With the data and semantic views in place, you're ready to build the ontology it
 
 A domain groups the nodes one business area owns.
 
-**Do:** in `sql/07_ontology.sql`, run the `Domains` section (the three `SYSTEM$CREATE_GLOSSARY_DOMAIN` statements).
+To create the domains, open `sql/07_ontology.sql` and run the `Domains` section (the three `SYSTEM$CREATE_GLOSSARY_DOMAIN` statements).
 
 **With CoCo instead:**
 
@@ -203,7 +203,7 @@ The domains are empty containers for now. Next, you fill them with entities, the
 
 Entities are the business objects that metrics measure. Describe them in business language, and name the key that identifies them.
 
-**Do:** in `07_ontology.sql`, run the three node sections (`Procurement nodes`, `Finance & Controlling nodes`, `Sales & Distribution nodes`), stopping at the `Approve` comment. The script is organised by domain, so this one run drafts the entities, metrics, terms and policies for Steps 2 to 4 together: 39 drafts. Steps 3 and 4 explain the metrics, terms and policies you just drafted and have nothing extra to run.
+Back in `07_ontology.sql`, run the three node sections (`Procurement nodes`, `Finance & Controlling nodes`, `Sales & Distribution nodes`), stopping at the `Approve` comment. The script is organised by domain, so this one run drafts the entities, metrics, terms and policies for Steps 2 to 4 together: 39 drafts. Steps 3 and 4 explain the metrics, terms and policies you just drafted and have nothing extra to run.
 
 **With CoCo instead:**
 
@@ -226,7 +226,7 @@ Entities give the ontology its nouns. Next come the metrics that measure them, w
 
 This is where most of the value comes from. For each metric, write down which number is canonical, and **also add the defensible-but-wrong look-alike** as its own node that says it is not the canonical one. That gives the agent something to tell apart.
 
-**Do:** nothing new to run; Step 2 drafted all 16 metrics. Read them in `07_ontology.sql` to see the pattern, for example *Supplier Count* next to *Vendor Record Count*, and *Revenue* next to *Gross Bookings*.
+There's nothing new to run here, because Step 2 already drafted all 16 metrics. Instead, read them in `07_ontology.sql` to see the pattern, for example *Supplier Count* next to *Vendor Record Count*, and *Revenue* next to *Gross Bookings*.
 
 **With CoCo instead:**
 
@@ -261,7 +261,7 @@ Metrics settle which number is official. Terms and policies add the company voca
 
 **Terms** decode codes and capture company vocabulary. **Policies** are rules the agent must apply.
 
-**Do:** nothing new to run; Step 2 drafted 7 of the 8 terms and all 3 policies. The eighth term, *Tier A Supplier*, is added at the end of Step 5, because the script adds it in its own section after the relationships.
+There's nothing new to run here either: Step 2 drafted 7 of the 8 terms and all 3 policies. The eighth term, *Tier A Supplier*, is added at the end of Step 5, because the script adds it in its own section after the relationships.
 
 **With CoCo instead:**
 
@@ -310,7 +310,7 @@ Relationships connect nodes with typed edges. Use the most specific type. Direct
 | `RELATED_TO` | only when nothing else fits | used sparingly |
 | `CUSTOM` | only on explicit request, and needs a label | Not used in the demo |
 
-**Do:** in `07_ontology.sql`, three actions in this order. Relationship calls refer to nodes by name, so the nodes must be approved first.
+In `07_ontology.sql`, work through three actions in this order. Relationship calls refer to nodes by name, so the nodes must be approved first.
 
 1. Approve the 39 drafts from Step 2 (this session only):
 
@@ -350,7 +350,7 @@ With nodes and relationships in place, take a moment to confirm that everything 
 
 Drafts are invisible to agents until they are approved. If you followed Step 5, everything is already approved; this step confirms it.
 
-**Do:** run the check below. If any counts are short, approve the remaining drafts with one of these forms:
+Start by running the check below. If any counts are short, approve the remaining drafts with one of these forms:
 
 ```sql
 -- Approve specific drafts, or everything from this session. Never call with no arguments:
@@ -398,7 +398,7 @@ The table lists the same roles, with how many of each the demo creates.
 | `DESCRIBES` | term → column | 7 |
 | `REFERENCE_DATA` | term → code table (T077K, T023T) | 2 |
 
-**Do:** run all of `sql/08_representations.sql`: 43 `SYSTEM$CREATE_GLOSSARY_ASSOCIATION` statements.
+Run all of `sql/08_representations.sql`, which contains 43 `SYSTEM$CREATE_GLOSSARY_ASSOCIATION` statements.
 
 **With CoCo instead:**
 
@@ -435,7 +435,7 @@ The ontology is complete and bound to your semantic views. Before an agent can u
 
 Agents search an index, not the live glossary. **Indexing can take up to about 6 hours**, and deleted terms can keep appearing in results for a while after deletion.
 
-**Do:** run these searches from a terminal with the Cortex Code CLI:
+To check, run these searches from a terminal with the Cortex Code CLI:
 
 ```bash
 cortex search object "supplier count" --types=business-ontology
@@ -456,7 +456,7 @@ The diagram below shows what happens when a question comes in. The agent first s
 
 ![How the agent uses the ontology](assets/agent.png)
 
-**Do:** run all of `sql/09_agents.sql`. It creates 7 agents with the same model, budget and core instructions. Agents with Business Ontology (BON) search turned on have `BON` in their name, such as `BON_AGENT`. The two you use for the A/B comparison are:
+Run all of `sql/09_agents.sql`. It creates 7 agents with the same model, budget and core instructions. Agents with Business Ontology (BON) search turned on have `BON` in their name, such as `BON_AGENT`. The two you use for the A/B comparison are:
 
 | Arm | Agent | Tools |
 |---|---|---|
@@ -534,7 +534,7 @@ Compare two agents that are identical except for the ontology tool: `ENRICHED_AG
 
 ### Try It
 
-**Do:** in Snowsight, open **AI & ML > Agents**, and ask `ENRICHED_AGENT` and then `BON_AGENT` the same two questions from the benchmark. For each question, the table gives the answer the ontology makes official and the look-alike answer an agent without it may give.
+In Snowsight, open **AI & ML > Agents**, and ask `ENRICHED_AGENT` and then `BON_AGENT` the same two questions from the benchmark. For each question, the table gives the answer the ontology makes official and the look-alike answer an agent without it may give.
 
 | Question | Correct answer | Defensible-but-wrong answer |
 |---|---|---|
@@ -547,7 +547,7 @@ Compare two agents that are identical except for the ontology tool: `ENRICHED_AG
 
 This part is optional and needs the Python requirements in **What You'll Need**. The benchmark asks 20 questions across four tiers, with ground truth in `sql/04_ground_truth.sql`.
 
-**Do:** from the repository root:
+From the repository root, run:
 
 ```bash
 pip install snowflake-connector-python
