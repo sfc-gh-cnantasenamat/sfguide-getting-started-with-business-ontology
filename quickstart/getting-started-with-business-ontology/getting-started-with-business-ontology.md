@@ -6,7 +6,7 @@ summary: Build a governed Business Ontology on top of well-built semantic views,
 environments: web
 status: Published
 feedback link: https://github.com/Snowflake-Labs/sfquickstarts/issues
-fork repo link: https://github.com/sfc-gh-cnantasenamat/getting-started-with-business-ontology
+fork repo link: https://github.com/sfc-gh-cnantasenamat/business-ontology
 
 # Getting Started with Business Ontology
 
@@ -75,7 +75,7 @@ Here's what you need before you start. Everything in the table is required excep
 | Account | Business Ontology enabled (Private Preview); search indexing enabled in your region |
 | Snowsight | **Catalog > Business Ontology**, and a SQL worksheet to run the scripts |
 | Role | One role for the whole guide, used as your primary role. It needs `CREATE ONTOLOGY DOMAIN` on the account to create the three domains (`ACCOUNTADMIN` has it by default), plus the usual privileges to create a database, warehouse, semantic views and agents. The role that creates a domain owns it, so it can then draft, approve and link nodes, and search them. The demo used ACCOUNTADMIN. |
-| Data | The [companion repository](https://github.com/sfc-gh-cnantasenamat/getting-started-with-business-ontology), which contains the synthetic SAP data, the semantic views, the ontology, the agents and the benchmark |
+| Data | The [companion repository](https://github.com/sfc-gh-cnantasenamat/business-ontology/tree/main/getting-started) (its `getting-started` folder), which contains the synthetic SAP data, the semantic views, the ontology, the agents and the benchmark |
 | CoCo | Cortex Code in Snowsight (opened by **Generate Ontology**, below) or Cortex Code Desktop, for the prompts, plus the Cortex Code CLI for the search check in Step 8. The `business-ontology` skill is bundled, so no install is needed. |
 | Python (optional) | Python 3.10+ and `snowflake-connector-python`, only for the full benchmark in Step 10 |
 | Time | About an hour of hands-on work, plus a variable search-indexing wait. Documentation says indexing can take 6 hours; verification first observed the required terms later than that (Step 8). |
@@ -176,9 +176,22 @@ Now that you know the shape of each step, you set up the demo data and the seman
 
 ## 0. Demo Setup
 
-Clone or download the [companion repository](https://github.com/sfc-gh-cnantasenamat/getting-started-with-business-ontology), then run the first six scripts in `sql/` in order. Everything lives in the `BUSINESS_ONTOLOGY` database and runs on the `BUSINESS_ONTOLOGY_WH` warehouse, split across two schemas: `RAW` holds the synthetic SAP source tables, and `SAP` holds everything you build on top of them. `03_sap_schema.sql` clones the `RAW` tables into `SAP` and stops with an error if they are missing.
+Clone or download the [companion repository](https://github.com/sfc-gh-cnantasenamat/business-ontology) and work from its `getting-started` folder, which keeps this project separate from any others in the repository. To clone it, run the commands below.
 
-**Expected after cloning or downloading:** the extracted repository contains the files below. This is a file-layout check, not captured clone-command output. Open `sql/01_setup.sql` in a SQL worksheet and keep that session for the build.
+```bash
+git clone https://github.com/sfc-gh-cnantasenamat/business-ontology.git
+cd business-ontology/getting-started
+```
+
+**Expected (illustrative clone output):** Git reports that it is cloning into `business-ontology`, and the second command leaves you in the project folder. Object and file counts in the clone output vary.
+
+```text
+Cloning into 'business-ontology'...
+```
+
+Then run the first six scripts in `sql/` in order. Everything lives in the `BUSINESS_ONTOLOGY` database and runs on the `BUSINESS_ONTOLOGY_WH` warehouse, split across two schemas: `RAW` holds the synthetic SAP source tables, and `SAP` holds everything you build on top of them. `03_sap_schema.sql` clones the `RAW` tables into `SAP` and stops with an error if they are missing.
+
+**Expected after cloning or downloading:** the `getting-started` folder contains the files below, shown relative to that folder. This is a file-layout check, not captured clone-command output. Open `sql/01_setup.sql` in a SQL worksheet and keep that session for the build.
 
 ```text
 sql/01_setup.sql
@@ -1136,7 +1149,7 @@ These diagnostic calls illustrate the difference, but they do not measure repeat
 
 This part is optional and needs the Python requirements in **What You'll Need**. The benchmark is a Python script that asks the agents 20 questions, grouped into four tiers, from controls that the semantic views alone can answer to questions that need cross-domain reasoning or governed definitions, and scores each answer against the correct one, called the ground truth, stored in `sql/04_ground_truth.sql`.
 
-From the repository root, install the Snowflake Python connector the script needs.
+From the `getting-started` folder, install the Snowflake Python connector the script needs.
 
 ```bash
 pip install snowflake-connector-python
@@ -1423,4 +1436,4 @@ To go deeper on any of these, the resources below are a good place to start.
 - [Access control](https://docs.snowflake.com/en/LIMITEDACCESS/snowflake-horizon/business-ontology-access-control): domain-level privileges
 - [Agent integration](https://docs.snowflake.com/en/LIMITEDACCESS/snowflake-horizon/business-ontology-agents): `snowscope_search` with the `businessOntology` corpus
 - [Horizon Context](https://docs.snowflake.com/en/user-guide/snowflake-horizon/horizon-context): how Business Ontology fits with semantic views and Cortex Sense
-- [Companion repository](https://github.com/sfc-gh-cnantasenamat/getting-started-with-business-ontology): build order, benchmark harness, web app and final results
+- [Companion repository](https://github.com/sfc-gh-cnantasenamat/business-ontology/tree/main/getting-started): build order, benchmark harness, Streamlit app and historical results
