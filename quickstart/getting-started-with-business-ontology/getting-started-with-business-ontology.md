@@ -324,9 +324,7 @@ A semantic view (SV) describes a set of tables in business terms, with metrics a
 SHOW SEMANTIC VIEWS IN SCHEMA BUSINESS_ONTOLOGY.SAP;
 ```
 
-#### Expected
-
-The statement returns six rows. These are the selected name and schema columns, sorted here for readability.
+**Expected after checking semantic views:** the statement returns six rows. These are the selected name and schema columns, sorted here for readability.
 
 | name | database_name | schema_name |
 |---|---|---|
